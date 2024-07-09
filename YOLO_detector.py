@@ -5,17 +5,17 @@ import logging
 logging.getLogger('ultralytics').setLevel(logging.ERROR)
 import json
 
-Video_folder = 'Data/BDD-X/Videos/videos/'
 
 class YOLO_detector:
     
-    def __init__(self, video_dict):
+    def __init__(self, video_dict, Video_folder):
         self.model = YOLO('best.pt')
         self.dict = video_dict
         self.video_indices = {video: idx for idx, video in enumerate(video_dict)}
+        self.Video_folder = Video_folder
     
     def load_video(self, video_index):
-        video_path = Video_folder + video_index
+        video_path = self.Video_folder + video_index
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
             raise IOError(f"Cannot open video {video_path}")
@@ -56,7 +56,7 @@ class YOLO_detector:
         cap.release()
         return yolo_results
     
-    def extract_classes_per_segment(self):
+    def extract_classes_per_segment(self, save_path):
         
         extracted_classes = {}
         
@@ -89,7 +89,7 @@ class YOLO_detector:
             
             extracted_classes[video_index] = segments_classes
         
-        with open('extracted_classes.json', 'w') as f:
+        with open(save_path, 'w') as f:
             json.dump(extracted_classes, f, indent=4)
   
         return 0
