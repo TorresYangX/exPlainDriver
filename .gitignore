@@ -2,3 +2,5 @@ Data/
 *.json
 *.pt
 *.pkl
+
+__pycache__/
