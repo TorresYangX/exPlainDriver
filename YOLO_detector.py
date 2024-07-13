@@ -4,14 +4,36 @@ from ultralytics import YOLO
 import logging
 logging.getLogger('ultralytics').setLevel(logging.ERROR)
 import json
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
+model_path = "/home/xuanyang/data/Meta-Llama-3-8B-Instruct/"
+tokenizer = AutoTokenizer.from_pretrained(model_path)
+model = AutoModelForCausalLM.from_pretrained(model_path).to("cuda:2")
+
+def Llama3_map(action):
+    
+    prompt_1 = "The current behavior of the car: \n"
+    
+    prompt_2 = "Which of the following actions most closely represents the current behavior of the car:\n"
+    
+    prompt_3 = "Keep, Accelerate, Decelerate, Stop, Reverse, MakeLeftTurn, MakeRightTurn, MakeUTurn, Merge, LeftPass, RightPass, Yield, ChangeToLeftLane, ChangeToRightLane, ChangeToCenterLeftTurnLane, Park, PullOver.\n"
+    
+    prompt_4 = "You must and can only choose one, and your answer needs to contain only your answer, without adding other explanations or extraneous content."
+    
+    input_text = prompt_1 + action + "\n" + prompt_2 + prompt_3 + prompt_4
+    
+    inputs = tokenizer(input_text, return_tensors="pt").to("cuda:2")
+    with torch.no_grad():
+        outputs = model.generate(**inputs, max_length=200)
+    output_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    return output_text
 
 class YOLO_detector:
     
     def __init__(self, video_dict, Video_folder):
         self.model = YOLO('best.pt')
         self.dict = video_dict
-        self.video_indices = {video: idx for idx, video in enumerate(video_dict)}
         self.Video_folder = Video_folder
     
     def load_video(self, video_index):
@@ -37,59 +59,56 @@ class YOLO_detector:
         video_length = total_frames / frame_rate
         print(f"Video length: {video_length:.2f}s, Frame rate: {frame_rate:.2f}fps, Total frames: {total_frames}")
 
-        yolo_results = []
+        yolo_results = set()
         frame_idx = 0
         while cap.isOpened():
             ret, frame = cap.read()
             if not ret:
                 break
-            time_in_seconds = frame_idx / frame_rate
             detections = self.detect_objects_yolo(frame)
             if detections:
-                for detection in detections:
-                    yolo_results.append({'time': time_in_seconds, 'class': detection})
-            else:
-                yolo_results.append({'time': time_in_seconds, 'class': None})
+                yolo_results.update(detections)
                 
             frame_idx += 1
         
         cap.release()
-        return yolo_results
+        return list(yolo_results)
     
-    def extract_classes_per_segment(self, save_path):
+    
+    def extract_classes(self, save_path):
         
-        extracted_classes = {}
+        extracted_data = []
         
-        for video_index in self.video_indices:
-            yolo_results = self.get_yolo_results_for_video(video_index)
+        action_list=["Keep", "Accelerate", "Decelerate", "Stop", "Reverse",
+        "MakeLeftTurn", "MakeRightTurn", "MakeUTurn", "Merge",
+        "LeftPass", "RightPass", "Yield", "ChangeToLeftLane",
+        "ChangeToRightLane", "ChangeToCenterLeftTurnLane",
+        "Park", "PullOver"]
         
-            segments_classes = {}
+        for item in self.dict:
             
-            i = 1
-            while f'Answer.{i}start' in self.dict[video_index]:
-                start_time = float(self.dict[video_index][f'Answer.{i}start'])
-                end_time = float(self.dict[video_index][f'Answer.{i}end'])
-                action = self.dict[video_index][f'Answer.{i}action']
-                
-                segment_key = f'Segment {i}'
-                segments_classes[segment_key] = {
-                    'action': action,
-                    'classes': set()
-                }
-                
-                for detection in yolo_results:
-                    detection_time = detection['time']
-                    if start_time <= detection_time <= end_time:
-                        segments_classes[segment_key]['classes'].add(detection['class'])
-                
-                i += 1
+            video_path = item['video']
             
-            for segment_key in segments_classes:
-                segments_classes[segment_key]['classes'] = list(segments_classes[segment_key]['classes'])
+            yolo_results = self.get_yolo_results_for_video(video_path)
+            print(item['action'])
+            action_rough = Llama3_map(item['action'])
+            print(action_rough)
+            question_end = action_rough.rfind("\n\n")
+            action = None
+            if question_end != -1:
+                answer = action_rough[question_end:].strip()
+                for act in action_list:
+                    if act in answer:
+                        action = act
             
-            extracted_classes[video_index] = segments_classes
+            extracted_data.append({
+                'id': item['id'],
+                'video': video_path,
+                'action': action,
+                'classes': yolo_results
+            })
         
         with open(save_path, 'w') as f:
-            json.dump(extracted_classes, f, indent=4)
+            json.dump(extracted_data, f, indent=4)
   
-        return 0
+        return extracted_data

@@ -1,16 +1,17 @@
-import pandas as pd
+import json
 
-video_indexs = ["06d501fd-a9ffc960.mov", "01b0505f-5f564e84.mov", "06d501fd-fd237e38.mov"]
-
-def query_annotation_csv(path):
-    result_dict = {}
-    table = pd.read_csv(path)
-    table = table.dropna(subset=['Input.Video'])
-    for video in video_indexs:
-        row = table[table['Input.Video'].str.contains(video)].iloc[0].dropna()
-        row = row.drop('Input.Video')
-        single_dict = row.to_dict()
-        result_dict[video] = single_dict
-    return result_dict
+def query_annotation_csv(path, train_num):
+    ori_data = json.load(open(path))[:train_num]
+    data = []
+    for item in ori_data:
+        single_data = {
+            'id': item['id'],
+            'video': item['video'],
+            'action': next(convo['value'] for convo in item['conversations'] if convo['from'] == 'gpt' and 'What is the action of ego car?' in item['conversations'][0]['value'])
+        }
+        data.append(single_data)
+    
+    return data
+    
         
     

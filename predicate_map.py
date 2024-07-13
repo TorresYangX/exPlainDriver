@@ -1,69 +1,56 @@
 # predicate vector:
 
-# Keep, Accelerate, Decelerate, Stop, MakeLeftTurn, MakeRightTurn, Merge, ChangeToLeftLane, ChangeToRightLane, PullOver
+# Keep, Accelerate, Decelerate, Stop, Reverse, MakeLeftTurn, MakeRightTurn, MakeUTurn, Merge, LeftPass, RightPass, Yield
+# ChangeToLeftLane, ChangeToRightLane, ChangeToCenterLeftTurnLane, Park, PullOver
 # TrafficLight, SolidGreenLight, SolidRedLight, SolidYellowLight, YellowLeftArrowLight, GreenLeftArrowLight, 
 # RedLeftArrowLight, IntersectionAhead, MergingTrafficSign, WrongWaySign, KeepRightSign, LaneEndsSign, 
 # NoLeftTurnSign, NoRightTurnSign, PedestrianCrossingSign, StopSign, ThruTrafficMergeLeftSign, RedYieldSign
 
-# action_extract_map = {
-#     ("stop",): "Stop",
-#     ("forward",): "Keep",
-#     ("accelerate",): "Accelerate",
-#     ("brake",): "Decelerate",
-#     ("merge",): "Merge",
-#     ("right", "turn"): "MakeRightTurn",
-#     ("right", "lane"): "ChangeToRightLane",
-#     ("left", "turn"): "MakeLeftTurn",
-#     ("left", "lane"): "ChangeToLeftLane",
-#     ("pull", "over"): "PullOver",
-#     ("continue",): "Keep",
-# }
-
 import json
 import pickle
 
-predicate_num = 28
+predicate_num = 35
 
 action_map = {
-    ("stop",): 3,
-    ("stops",): 3,
-    ("stopped",): 3,
-    ("forward",): 0,
-    ("accelerate",): 1,
-    ("accelerates",): 1,
-    ("accelerating",): 1,
-    ("slow",): 2,
-    ("slows",): 2,
-    ("brake",): 2,
-    ("merge",): 6,
-    ("right", "turn"): 5,
-    ("right", "lane"): 8,
-    ("left", "turn"): 4,
-    ("left", "lane"): 7,
-    ("pull", "over"): 9,
-    ("continue",): 0,
+    "Keep": 0, 
+    "Accelerate": 1, 
+    "Decelerate": 2, 
+    "Stop": 3, 
+    "Reverse": 4, 
+    "MakeLeftTurn": 5, 
+    "MakeRightTurn": 6, 
+    "MakeUTurn": 7, 
+    "Merge": 8, 
+    "LeftPass": 9, 
+    "RightPass": 10, 
+    "Yield": 11,
+    "ChangeToLeftLane": 12, 
+    "ChangeToRightLane": 13, 
+    "ChangeToCenterLeftTurnLane": 14, 
+    "Park": 15, 
+    "PullOver": 16
 }
 
 class_map = {
-    "addedLane": 18,
+    "addedLane": 25,
     "curveLeft": None,
     "curveRight": None,
     "dip": None,
-    "doNotEnter": 19,
+    "doNotEnter": 26,
     "doNotPass": None,
-    "go": 11,
-    "go forward": 11,
-    "go forward traffic light": 11,
-    "go left": 15,
-    "go left traffic light": 15,
-    "go traffic light": 11,
-    "intersection": 17,
-    "keepRight": 20,
-    "laneEnds": 21,
-    "merge": 18,
-    "noLeftTurn": 22,
-    "noRightTurn": 23,
-    "pedestrianCrossing": 24,
+    "go": 18,
+    "go forward": 18,
+    "go forward traffic light": 18,
+    "go left": 22,
+    "go left traffic light": 22,
+    "go traffic light": 18,
+    "intersection": 24,
+    "keepRight": 27,
+    "laneEnds": 28,
+    "merge": 25,
+    "noLeftTurn": 29,
+    "noRightTurn": 30,
+    "pedestrianCrossing": 31,
     "rampSpeedAdvisory20": None,
     "rampSpeedAdvisory35": None,
     "rampSpeedAdvisory40": None,
@@ -86,23 +73,23 @@ class_map = {
     "speedLimit55": None,
     "speedLimit65": None,
     "speedLimitUrdbl": None,
-    "stop": 25,
-    "stop left": 16, 
-    "stop left traffic light": 16, 
-    "stop traffic light": 12, 
-    "stopAhead": 25,
-    "thruMergeLeft": 26,
+    "stop": 32,
+    "stop left": 23, 
+    "stop left traffic light": 23, 
+    "stop traffic light": 19, 
+    "stopAhead": 32,
+    "thruMergeLeft": 33,
     "thruMergeRight": None,
-    "thruTrafficMergeLeft": 26,
+    "thruTrafficMergeLeft": 33,
     "truckSpeedLimit55": None,
     "turnLeft": None,
     "turnRight": None,
-    "warning": 13, 
-    "warning left": 14, 
-    "warning left traffic light": 14, 
-    "warning traffic light": 13, 
-    "yield": 27,
-    "yieldAhead": 27,
+    "warning": 20, 
+    "warning left": 21, 
+    "warning left traffic light": 21, 
+    "warning traffic light": 20, 
+    "yield": 34,
+    "yieldAhead": 34,
     "zoneAhead25": None,
     "zoneAhead45": None
 }
@@ -112,12 +99,8 @@ def map_action_to_vector(action):
     
     vector = [0] * predicate_num
     
-    input_str_lower = action.lower()
-    words = input_str_lower.split()
-    for i in range(len(words)):
-        for keys, index in action_map.items():
-            if all(key in words[i:i+len(keys)] for key in keys):
-                vector[index] = 1
+    index = action_map[action]
+    vector[index] = 1
     return vector
 
 def map_classes_to_vector(classes):
@@ -133,8 +116,8 @@ def map_classes_to_vector(classes):
 
 def combine_vectors(action_vector, class_vector):
     combined_vector = [max(a, c) for a, c in zip(action_vector, class_vector)]
-    if any(combined_vector[11:17]):
-        combined_vector[10] = 1 # TrafficLight
+    if any(combined_vector[18:24]):
+        combined_vector[17] = 1 # TrafficLight
     return combined_vector
 
 def segment_to_vector(segment):
@@ -142,12 +125,14 @@ def segment_to_vector(segment):
     class_vector = map_classes_to_vector(segment["classes"])
     return combine_vectors(action_vector, class_vector)
 
-def json_to_vectors(data, train_data_savePth):
+def json_to_vectors(YOLO_detect_path, train_data_savePth):
+    
+    data = json.load(open(YOLO_detect_path))
+    
     vectors = []
-    for video, segments in data.items():
-        for segment_name, segment in segments.items():
-            vector = segment_to_vector(segment)
-            vectors.append(vector)
+    for item in data:
+        vector = segment_to_vector(item)
+        vectors.append(vector)
     with open(train_data_savePth, "wb") as f:
         pickle.dump(vectors, f)
         
