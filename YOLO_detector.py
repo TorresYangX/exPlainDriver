@@ -1,10 +1,12 @@
 import cv2
-import numpy as np
-from ultralytics import YOLO
-import logging
-logging.getLogger('ultralytics').setLevel(logging.ERROR)
 import json
 import torch
+import string
+import logging
+import numpy as np
+from tqdm import tqdm
+from ultralytics import YOLO
+logging.getLogger('ultralytics').setLevel(logging.ERROR)
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 model_path = "/home/xuanyang/data/Meta-Llama-3-8B-Instruct/"
@@ -13,21 +15,20 @@ model = AutoModelForCausalLM.from_pretrained(model_path).to("cuda:2")
 
 def Llama3_map(action):
     
-    prompt_1 = "The current behavior of the car: \n"
-    
+    prompt_1 = "The current behavior of the car:\n"
     prompt_2 = "Which of the following actions most closely represents the current behavior of the car:\n"
-    
     prompt_3 = "Keep, Accelerate, Decelerate, Stop, Reverse, MakeLeftTurn, MakeRightTurn, MakeUTurn, Merge, LeftPass, RightPass, Yield, ChangeToLeftLane, ChangeToRightLane, ChangeToCenterLeftTurnLane, Park, PullOver.\n"
-    
-    prompt_4 = "You must and can only choose one, and your answer needs to contain only your answer, without adding other explanations or extraneous content."
-    
-    input_text = prompt_1 + action + "\n" + prompt_2 + prompt_3 + prompt_4
+    prompt_4 = "You must and can only choose one, and your answer needs to contain only your answer, without adding other explanations or extraneous content.\n"
+    prompt_5 = "Answer:"
+    input_text = prompt_1 + action + "\n" + prompt_2 + prompt_3 + prompt_4 + prompt_5
     
     inputs = tokenizer(input_text, return_tensors="pt").to("cuda:2")
     with torch.no_grad():
-        outputs = model.generate(**inputs, max_length=200)
-    output_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+        outputs = model.generate(**inputs, max_new_tokens=4)
+    generated_token = outputs[0][len(inputs['input_ids'][0]):]
+    output_text = tokenizer.decode(generated_token, skip_special_tokens=True).strip()
     return output_text
+
 
 class YOLO_detector:
     
@@ -52,12 +53,26 @@ class YOLO_detector:
                 detections.append(class_name)
         return detections
     
-    def get_yolo_results_for_video(self, video_index):
+    def get_yolo_results_for_video(self, video_index, start_time, end_time):
+        
+        try:
+            start_time = float(start_time)
+            end_time = float(end_time)
+        except ValueError:
+            print("Invalid start_time or end_time:{}".format(video_index))
+            return []
+            
         cap = self.load_video(video_index)
         frame_rate = cap.get(cv2.CAP_PROP_FPS)
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        video_length = total_frames / frame_rate
-        print(f"Video length: {video_length:.2f}s, Frame rate: {frame_rate:.2f}fps, Total frames: {total_frames}")
+
+        # Calculate the frame range for the specified time window
+        start_frame = int(start_time * frame_rate)
+        end_frame = int(end_time * frame_rate)
+        if start_frame >= total_frames or end_frame > total_frames or start_frame >= end_frame:
+            print("Invalid start_time or end_time")
+            cap.release()
+            return []
 
         yolo_results = set()
         frame_idx = 0
@@ -65,9 +80,12 @@ class YOLO_detector:
             ret, frame = cap.read()
             if not ret:
                 break
-            detections = self.detect_objects_yolo(frame)
-            if detections:
-                yolo_results.update(detections)
+            if frame_idx >= start_frame:
+                if frame_idx > end_frame:
+                    break
+                detections = self.detect_objects_yolo(frame)
+                if detections:
+                    yolo_results.update(detections)
                 
             frame_idx += 1
         
@@ -85,21 +103,23 @@ class YOLO_detector:
         "ChangeToRightLane", "ChangeToCenterLeftTurnLane",
         "Park", "PullOver"]
         
-        for item in self.dict:
+        print('Extracting classes from YOLO...')
+        
+        for item in tqdm(self.dict):
             
-            video_path = item['video']
+            video_path = item['original_video']
+            start_time = item['start_time']
+            end_time = item['end_time']
             
-            yolo_results = self.get_yolo_results_for_video(video_path)
-            print(item['action'])
-            action_rough = Llama3_map(item['action'])
-            print(action_rough)
-            question_end = action_rough.rfind("\n\n")
+            yolo_results = self.get_yolo_results_for_video(video_path, start_time, end_time)
+            answer = Llama3_map(item['action'])
+            characters_to_remove = string.whitespace + string.punctuation
+            answer = answer.strip(characters_to_remove)
             action = None
-            if question_end != -1:
-                answer = action_rough[question_end:].strip()
-                for act in action_list:
-                    if act in answer:
-                        action = act
+            for act in action_list:
+                if act.lower() in answer.lower():
+                    action = act
+                    break
             
             extracted_data.append({
                 'id': item['id'],
