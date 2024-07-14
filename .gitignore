@@ -2,5 +2,6 @@ Data/
 *.json
 *.pt
 *.pkl
+*.npy
 
 __pycache__/
