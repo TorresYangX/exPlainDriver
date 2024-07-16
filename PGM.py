@@ -1,8 +1,13 @@
 import numpy as np
+import torch.nn.functional as F
+import torch
 
 action_num = 17
 condition_num = 20
-action_indices = list(range(17))
+action_indices = list(range(action_num))
+
+def compute_interface_weights(p_i):
+    return np.log(p_i / (1 - p_i))
 
 def compute_satisfaction(data, formulas):
     satisfaction_counts = np.zeros((len(data), len(formulas)))
@@ -15,14 +20,14 @@ def log_sum_exp(x):
     max_x = np.max(x)
     return max_x + np.log(np.sum(np.exp(x - max_x)))
 
-def compute_log_likelihood(satisfaction_counts, weights, regularization):
-    weighted_sum = satisfaction_counts @ weights
+def compute_log_likelihood(satisfaction_counts, weights, interface_weights, regularization):
+    weighted_sum = satisfaction_counts @ weights + interface_weights
     log_likelihood = np.sum(weighted_sum) - log_sum_exp(weighted_sum)
     log_likelihood -= 0.5 * regularization * np.sum(weights ** 2)  # L2 regularize
     return log_likelihood
 
-def update_weights(weights, satisfaction_counts, learning_rate, regularization):
-    weighted_sum = satisfaction_counts @ weights
+def update_weights(weights, satisfaction_counts, interface_weights, learning_rate, regularization):
+    weighted_sum = satisfaction_counts @ weights + interface_weights
     expected_satisfaction = np.exp(weighted_sum - log_sum_exp(weighted_sum))
     
     gradient = np.sum(satisfaction_counts, axis=0) - np.sum(expected_satisfaction[:, None] * satisfaction_counts, axis=0)
@@ -36,7 +41,7 @@ def update_weights(weights, satisfaction_counts, learning_rate, regularization):
 def generate_possible_instances(condition_input):
     possible_instances = []
     for action in action_indices:
-        instance = np.zeros(action_num+condition_num)
+        instance = np.zeros(action_num + condition_num)
         instance[action_num:] = condition_input 
         instance[action] = 1 
         possible_instances.append(instance)
@@ -45,24 +50,10 @@ def generate_possible_instances(condition_input):
 def compute_accuracy(true_labels, predictions):
     return np.mean(true_labels == predictions)
 
-def compute_precision(true_labels, predictions):
-    true_positive = np.sum((true_labels == 1) & (predictions == 1))
-    false_positive = np.sum((true_labels == 0) & (predictions == 1))
-    return true_positive / (true_positive + false_positive) if (true_positive + false_positive) > 0 else 0
-
-def compute_recall(true_labels, predictions):
-    true_positive = np.sum((true_labels == 1) & (predictions == 1))
-    false_negative = np.sum((true_labels == 1) & (predictions == 0))
-    return true_positive / (true_positive + false_negative) if (true_positive + false_negative) > 0 else 0
-
-def compute_f1_score(precision, recall):
-    return 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
-
-
 
 class PGM:
     
-    def __init__(self, weight_path=None, learning_rate=0.01, max_iter=100, tol=1e-6, regularization=0.01):
+    def __init__(self, weight_path=None, learning_rate=0.01, max_iter=100, tol=1e-6, regularization=0.01, temperature=0.3):
         
         self.formulas = [
             lambda args: 1 - args[19] + args[19] * args[3],  # SolidRedLight → Stop
@@ -91,9 +82,10 @@ class PGM:
         self.max_iter = max_iter
         self.tol = tol
         self.regularization = regularization
+        self.temperature = temperature
+        
 
-
-    def train_mln(self, data, validation_data=None):
+    def train_mln(self, data, saving_path, validation_data=None):
         
         """
         data: np.array([...])
@@ -102,50 +94,75 @@ class PGM:
         weights = self.weights
         prev_log_likelihood = -np.inf
         prev_acc = -np.inf
-        true_labels = np.argmax(data[:, :17], axis=1)
+        
+        
+        true_labels = np.argmax(data[:, :action_num], axis=1)
+        
+        # compute interface weights
+        action_vector = data[:, :action_num]
+        action_prob = F.gumbel_softmax(torch.tensor(action_vector).float(), tau=self.temperature, hard=False).numpy()
+        max_prob = np.max(action_prob, axis=1)
+        interface_weights = np.clip(max_prob, 1e-6, 1 - 1e-6)
         
         for iteration in range(self.max_iter):
+            # Compute satisfaction counts
             satisfaction_counts = compute_satisfaction(data, self.formulas)
-            log_likelihood = compute_log_likelihood(satisfaction_counts, weights, self.regularization)
+            
+            # Compute log likelihood
+            log_likelihood = compute_log_likelihood(satisfaction_counts, weights, interface_weights, self.regularization)
             print(f"Iteration {iteration}, Log Likelihood: {log_likelihood}")
             
             if np.abs(log_likelihood - prev_log_likelihood) < self.tol:
                 break
             
+            # Compute average probability of ground truth action
             predictions_prob = []
             for instance in data:
-                condition_input = instance[17:]
-                action_probs = self.infer_action_probability(condition_input)
+                condition_input = instance[action_num:]
+                action_probs, _ = self.infer_action_probability(condition_input)
                 predictions_prob.append(action_probs[true_labels[len(predictions_prob)]])
         
             avg_prob = np.mean(predictions_prob)
             print(f"Iteration {iteration}, Average Probability of Ground Truth Action: {avg_prob}")
             
             if validation_data is not None:
-                acc,_,_,_ = self.eval(validation_data)
+                acc = self.eval(validation_data)
                 print(f"Iteration {iteration}, Validation Score: {acc}")
                 if np.abs(acc - prev_acc) < self.tol:
                     print("Validation score converged.")
                     break
             
             prev_log_likelihood = log_likelihood
-            weights = update_weights(weights, satisfaction_counts, self.learning_rate, self.regularization)
+            weights = update_weights(weights, satisfaction_counts, interface_weights, self.learning_rate, self.regularization)
             self.weights = weights
+            # save best weights
+            if validation_data is not None and acc > prev_acc:
+                np.save(saving_path, weights)
+                prev_acc = acc
+                print(f"Saving weights at iteration {iteration}")
             
         return weights
     
-    def validate_model(self, validation_data):
-        satisfaction_counts = compute_satisfaction(validation_data, self.formulas)
-        log_likelihood = compute_log_likelihood(satisfaction_counts, self.weights)
-        return log_likelihood
     
     def infer_action_probability(self, condition_input):
         possible_instances = generate_possible_instances(condition_input)
         satisfaction_counts = compute_satisfaction(possible_instances, self.formulas)
-        log_probs = satisfaction_counts @ self.weights
-        probs = np.exp(log_probs)
-        probs /= np.sum(probs)
-        return probs
+        
+        # generate interface weights
+        action_vector = possible_instances[:, :action_num]
+        action_prob = F.gumbel_softmax(torch.tensor(action_vector).float(), tau=self.temperature, hard=False).numpy()
+        max_prob = np.max(action_prob, axis=1)
+        interface_weights = np.clip(max_prob, 1e-6, 1 - 1e-6)
+        
+        
+        log_probs = satisfaction_counts @ self.weights + interface_weights
+        max_log_probs = np.max(log_probs)
+        stabilized_log_probs = log_probs - max_log_probs
+        exp_probs = np.exp(stabilized_log_probs)
+        probs = exp_probs / np.sum(exp_probs)
+        action_index = np.argmax(probs)
+        return probs, action_index
+    
     
     def eval(self, test_data):
         true_labels = np.argmax(test_data[:, :action_num], axis=1)
@@ -153,27 +170,11 @@ class PGM:
         
         for instance in test_data:
             condition_input = instance[action_num:]
-            action_probs = self.infer_action_probability(condition_input)
-            predicted_action = np.argmax(action_probs)
-            predictions.append(predicted_action)
+            _, action_index = self.infer_action_probability(condition_input)
+            predictions.append(action_index)
             
         predictions = np.array(predictions)
         
         accuracy = compute_accuracy(true_labels, predictions)
-        precision_list = []
-        recall_list = []
-        f1_list = []
         
-        for label in range(17):  
-            precision = compute_precision(true_labels == label, predictions == label)
-            recall = compute_recall(true_labels == label, predictions == label)
-            f1_score = compute_f1_score(precision, recall)
-            precision_list.append(precision)
-            recall_list.append(recall)
-            f1_list.append(f1_score)
-        
-        precision = np.mean(precision_list)
-        recall = np.mean(recall_list)
-        f1_score = np.mean(f1_list)
-        
-        return accuracy, precision, recall, f1_score
+        return accuracy
