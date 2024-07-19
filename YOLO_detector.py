@@ -30,6 +30,51 @@ def Llama3_map(action):
     return output_text
 
 
+def detect_single_frame(data_dict):
+    yolo = YOLO('best.pt')
+    video_path = data_dict['original_video']
+    try:
+        start_time = float(data_dict['start_time'])
+        end_time = float(data_dict['end_time'])
+    except ValueError:
+        print("Invalid start_time or end_time:{}".format(video_path))
+        return []
+    
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        raise IOError(f"Cannot open video {video_path}")
+    
+    frame_rate = cap.get(cv2.CAP_PROP_FPS)
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    
+    start_frame = int(start_time * frame_rate)
+    end_frame = int(end_time * frame_rate)
+    if start_frame >= total_frames or end_frame > total_frames or start_frame >= end_frame:
+        print("Invalid start_time or end_time")
+        cap.release()
+        return []
+    
+    cap.set(cv2.CAP_PROP_POS_FRAMES, end_frame)
+    ret, frame = cap.read()
+    if not ret:
+        print("Failed to read the end frame")
+        cap.release()
+        return []
+    
+    yolo_results = set()
+    detections = yolo(frame)
+    detected_classes = []
+    for detection in detections:
+        for box in detection.boxes:
+            class_name = yolo.names[int(box.cls)]
+            detected_classes.append(class_name)
+    if detected_classes:
+            yolo_results.update(detected_classes)
+    
+    cap.release()
+    return list(yolo_results)
+
+
 class YOLO_detector:
     
     def __init__(self, video_dict, Video_folder):
@@ -53,7 +98,8 @@ class YOLO_detector:
                 detections.append(class_name)
         return detections
     
-    def get_yolo_results_for_video(self, video_index, start_time, end_time):
+    # detection whole segment
+    def get_yolo_results_for_segment(self, video_index, start_time, end_time):
         
         try:
             start_time = float(start_time)
@@ -93,15 +139,50 @@ class YOLO_detector:
         return list(yolo_results)
     
     
+    # detect from last frame
+    def get_yolo_results_for_last_frame(self, video_index, start_time, end_time):
+        try:
+            start_time = float(start_time)
+            end_time = float(end_time)
+        except ValueError:
+            print("Invalid start_time or end_time:{}".format(video_index))
+            return []
+            
+        cap = self.load_video(video_index)
+        frame_rate = cap.get(cv2.CAP_PROP_FPS)
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+        # Calculate the frame range for the specified time window
+        start_frame = int(start_time * frame_rate)
+        end_frame = int(end_time * frame_rate)
+        if start_frame >= total_frames or end_frame > total_frames or start_frame >= end_frame:
+            print("Invalid start_time or end_time")
+            cap.release()
+            return []
+
+        cap.set(cv2.CAP_PROP_POS_FRAMES, end_frame)
+        ret, frame = cap.read()
+        if not ret:
+            print("Failed to read the end frame")
+            cap.release()
+            return []
+
+        yolo_results = set()
+        detections = self.detect_objects_yolo(frame)
+        if detections:
+            yolo_results.update(detections)
+
+        cap.release()
+        return list(yolo_results)
+
+    
+    
     def extract_classes(self, save_path):
         
         extracted_data = []
         
-        action_list=["Keep", "Accelerate", "Decelerate", "Stop", "Reverse",
-        "MakeLeftTurn", "MakeRightTurn", "MakeUTurn", "Merge",
-        "LeftPass", "RightPass", "Yield", "ChangeToLeftLane",
-        "ChangeToRightLane", "ChangeToCenterLeftTurnLane",
-        "Park", "PullOver"]
+        action_list=["Decelerate", "Stop", "Reverse", "MakeLeftTurn", 
+                     "MakeRightTurn", "MakeUTurn", "LeftPass", "RightPass"]
         
         print('Extracting classes from YOLO...')
         
@@ -111,7 +192,12 @@ class YOLO_detector:
             start_time = item['start_time']
             end_time = item['end_time']
             
-            yolo_results = self.get_yolo_results_for_video(video_path, start_time, end_time)
+            # yolo_results = self.get_yolo_results_for_segment(video_path, start_time, end_time)
+            yolo_results = self.get_yolo_results_for_last_frame(video_path, start_time, end_time)
+            
+            if not yolo_results:
+                continue
+            
             answer = Llama3_map(item['action'])
             characters_to_remove = string.whitespace + string.punctuation
             answer = answer.strip(characters_to_remove)
@@ -120,6 +206,9 @@ class YOLO_detector:
                 if act.lower() in answer.lower():
                     action = act
                     break
+                
+            if action is None:
+                continue
             
             extracted_data.append({
                 'id': item['id'],
@@ -132,3 +221,5 @@ class YOLO_detector:
             json.dump(extracted_data, f, indent=4)
   
         return extracted_data
+    
+    
