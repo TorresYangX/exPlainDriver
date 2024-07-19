@@ -2,9 +2,33 @@ import numpy as np
 import torch.nn.functional as F
 import torch
 
-action_num = 17
-condition_num = 20
+action_num = 8
+condition_num = 13
 action_indices = list(range(action_num))
+
+
+DECELAERATE = 0
+STOP = 1
+REVERSE = 2
+MAKE_LEFT_TURN = 3
+MAKE_RIGHT_TURN = 4
+MAKE_U_TURN = 5
+LEFT_PASS = 6
+RIGHT_PASS = 7
+SOLID_RED_LIGHT = 8
+SOLID_YELLOW_LIGHT = 9
+YELLOW_LEFT_ARROW_LIGHT = 10
+RED_LEFT_ARROW_LIGHT = 11
+MERGING_TRAFFIC_SIGN = 12
+WRONG_WAY_SIGN = 13
+NO_LEFT_TURN_SIGN = 14
+NO_RIGHT_TURN_SIGN = 15
+PEDESTRIAN_CROSSING_SIGN = 16
+STOP_SIGN = 17
+RED_YIELD_SIGN = 18
+DO_NOT_PASS_SIGN = 19
+SLOW_SIGN = 20
+
 
 def compute_interface_weights(p_i):
     return np.log(p_i / (1 - p_i))
@@ -56,21 +80,27 @@ class PGM:
     def __init__(self, weight_path=None, learning_rate=0.01, max_iter=100, tol=1e-6, regularization=0.01, temperature=0.3):
         
         self.formulas = [
-            lambda args: 1 - args[19] + args[19] * args[3],  # SolidRedLight → Stop
-            lambda args: 1 - args[18] + args[18] * (args[1] + args[0] - args[1] * args[0]),  # SolidGreenLight → Accelerate ∨ Keep
-            lambda args: 1 - args[24] * args[18] + args[24] * args[18] * args[7],  # IntersectionAhead ∧ SolidGreenLight → MakeUTurn
-            lambda args: 1 - args[20] * args[24] + args[20] * args[24] * args[3],  # SolidYellowLight ∧ IntersectionAhead → Stop
-            lambda args: 1 - args[21] * args[24] + args[21] * args[24] * args[3],  # YellowLeftArrowLight ∧ IntersectionAhead → Stop
-            lambda args: 1 - args[22] + args[22] * (args[5] + args[7] - args[5] * args[7]),  # GreenLeftArrowLight → MakeLeftTurn ∨ MakeUTurn
-            lambda args: 1 - args[23] + args[23] * args[3] * (1 - (args[5] + args[7] - args[5] * args[7])),  # RedLeftArrowLight → Stop ∧ ¬(MakeLeftTurn ∨ MakeUTurn)
-            lambda args: 1 - args[25] + args[25] * args[2],  # MergingTrafficSign → Decelerate
-            lambda args: 1 - args[26] + args[26] * (args[3] + args[4] + args[7] - args[3] * args[4] - args[3] * args[7] - args[4] * args[7] + args[3] * args[4] * args[7]),  # WrongWaySign → Stop ∨ Reverse ∨ MakeUTurn
-            lambda args: 1 - args[27] + args[27] * args[13],  # KeepRightSign → ChangeToRightLane
-            lambda args: 1 - args[29] + args[29] * (1 - args[5]),  # NoLeftTurnSign → ¬MakeLeftTurn
-            lambda args: 1 - args[30] + args[30] * (1 - args[6]),  # NoRightTurnSign → ¬MakeRightTurn
-            lambda args: 1 - args[31] + args[31] * args[2],  # PedestrianCrossingSign → Decelerate
-            lambda args: 1 - args[32] + args[32] * args[3],  # StopSign → Stop
-            lambda args: 1 - args[33] + args[33] * args[12],  # ThruTrafficMergeLeftSign → ChangeToLeftLane
+            
+            lambda args: 1 - args[SOLID_RED_LIGHT] + args[SOLID_RED_LIGHT] * args[STOP],  # SolidRedLight → Stop
+            lambda args: 1 - args[SOLID_YELLOW_LIGHT] + args[SOLID_YELLOW_LIGHT] * (args[STOP] + args[DECELAERATE] - args[STOP] * args[DECELAERATE]),  # SolidYellowLight → Stop ∨ Decelerate
+            lambda args: 1 - args[YELLOW_LEFT_ARROW_LIGHT] + args[YELLOW_LEFT_ARROW_LIGHT] * (args[STOP] + args[DECELAERATE] - args[STOP] * args[DECELAERATE]),  # YellowLeftArrowLight → Stop ∨ Decelerate
+            lambda args: 1 - args[RED_LEFT_ARROW_LIGHT] + args[RED_LEFT_ARROW_LIGHT] * args[STOP] * (1 - (args[MAKE_LEFT_TURN] + args[MAKE_U_TURN] - args[MAKE_LEFT_TURN] * args[MAKE_U_TURN])),  # RedLeftArrowLight → Stop ∧ ¬(MakeLeftTurn ∨ MakeUTurn)
+            lambda args: 1 - args[MERGING_TRAFFIC_SIGN] + args[MERGING_TRAFFIC_SIGN] * args[DECELAERATE],  # MergingTrafficSign → Decelerate
+            lambda args: 1 - args[WRONG_WAY_SIGN] + args[WRONG_WAY_SIGN] * (args[STOP] + args[MAKE_U_TURN] + args[REVERSE] - args[STOP] * args[MAKE_U_TURN] - args[STOP] * args[REVERSE] - args[MAKE_U_TURN] * args[REVERSE] + args[STOP] * args[MAKE_U_TURN] * args[REVERSE]),  # WrongWaySign → Stop ∨ Reverse ∨ MakeUTurn
+            lambda args: 1 - args[NO_LEFT_TURN_SIGN] + args[NO_LEFT_TURN_SIGN] * (1 - args[MAKE_LEFT_TURN]),  # NoLeftTurnSign → ¬MakeLeftTurn
+            lambda args: 1 - args[NO_RIGHT_TURN_SIGN] + args[NO_RIGHT_TURN_SIGN] * (1 - args[MAKE_RIGHT_TURN]),  # NoRightTurnSign → ¬MakeRightTurn
+            lambda args: 1 - args[PEDESTRIAN_CROSSING_SIGN] + args[PEDESTRIAN_CROSSING_SIGN] * (args[STOP] + args[DECELAERATE] - args[STOP] * args[DECELAERATE]),  # PedestrianCrossingSign → Decelerate ∨ Stop 
+            lambda args: 1 - args[STOP_SIGN] + args[STOP_SIGN] * args[STOP],  # StopSign → Stop
+            lambda args: 1 - args[RED_YIELD_SIGN] + args[RED_YIELD_SIGN] * args[DECELAERATE], # RedYieldSign → Decelerate
+            lambda args: 1 - args[DO_NOT_PASS_SIGN] + args[DO_NOT_PASS_SIGN] * (1 - (args[LEFT_PASS] + args[RIGHT_PASS] - args[LEFT_PASS] * args[RIGHT_PASS])), # DoNotPassSign → ¬(LeftPass ∨ RightPass)
+            lambda args: 1 - args[SLOW_SIGN] + args[SLOW_SIGN] * args[DECELAERATE] # SlowSign → Decelerate
+
+            
+            # lambda args: 1 - args[18] + args[18] * (args[1] + args[0] - args[1] * args[0]),  # SolidGreenLight → Accelerate ∨ Keep
+            # lambda args: 1 - args[24] * args[18] + args[24] * args[18] * args[7],  # IntersectionAhead ∧ SolidGreenLight → MakeUTurn
+            # lambda args: 1 - args[22] + args[22] * (args[5] + args[7] - args[5] * args[7]),  # GreenLeftArrowLight → MakeLeftTurn ∨ MakeUTurn
+            # lambda args: 1 - args[27] + args[27] * args[13],  # KeepRightSign → ChangeToRightLane
+            # lambda args: 1 - args[33] + args[33] * args[12],  # ThruTrafficMergeLeftSign → ChangeToLeftLane
         ]
         
         if weight_path:
