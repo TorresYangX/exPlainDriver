@@ -190,9 +190,6 @@ def LLM_PGM_acc(weight_save_path, LLM_result_path, ground_truth_path):
                     'ground_truth_action': ground_action  
                 })
                 correct += 1
-                # save the correct case
-                with open('correct_case.json', 'w') as f:
-                    json.dump(correct_case, f)
                 
             else:
                 wrong_case.append({
