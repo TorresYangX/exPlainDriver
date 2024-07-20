@@ -5,3 +5,4 @@ Data/
 *.npy
 
 __pycache__/
+test_case/
