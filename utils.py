@@ -20,31 +20,34 @@ def action_counter(json_path):
     return action_count
 
 
-def video_snapshot(video_path, output_folder, interval=1):
-    video_name = video_path.split('/')[-1].split('.')[0]
+def video_snapshot(video_path, output_folder, start_second, end_second, interval=1):
+    video_name = video_path.split('/')[-1].split('.')[0] + str(start_second) + '_' + str(end_second)
     output_path = os.path.join(output_folder, video_name)
     
     if not os.path.exists(output_path):
         os.makedirs(output_path)
+           
+    cap = cv2.VideoCapture(video_path)    
+    fps = cap.get(cv2.CAP_PROP_FPS)    
+    start_frame = start_second * fps
+    end_frame = end_second * fps
         
-    cap = cv2.VideoCapture(video_path)
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    frame_interval = int(fps * 0.5)
     frame_count = 0
-    image_count = 0
-
+    image_count = start_second
+    
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
             break
-
-        if frame_count % frame_interval == 0:
-            image_path = os.path.join(output_path, f'image_{image_count:04d}.jpg')
-            cv2.imwrite(image_path, frame)
-            image_count += 1
-
+        # read video from start_frame to end_frame, and save picture every 1 seconds
+        if frame_count >= start_frame and frame_count <= end_frame:
+            if frame_count % round(interval * fps) == 0:
+                image_name = os.path.join(output_path, f'{image_count}.jpg')
+                cv2.imwrite(image_name, frame)
+                image_count += 1
+            
         frame_count += 1
-
+        
     cap.release()
     return
 
@@ -66,4 +69,12 @@ if __name__ == "__main__":
         
     # print(prob)
     
-    video_snapshot('Data/BDD-X/Videos/videos/1aecebd4-af1a595a.mov', 'Data/video_snapshot')
+    video_path_root = 'Data/BDD-X/Videos/videos/'
+    output_folder = 'Data/video_snapshot'
+    
+    video = '2af58da3-c04e01b3.mov'
+    start = 0
+    end = 21
+    
+    video_path = os.path.join(video_path_root, video)
+    video_snapshot(video_path, output_folder, start, end)
