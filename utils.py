@@ -2,6 +2,11 @@ import pickle
 import json
 import cv2
 import os
+import numpy as np
+from pgm.YOLO_detector import YOLO_detector
+from pgm.video_annotation import query_annotation_csv
+from pgm.predicate_map import json_to_vectors
+from pgm.PGM import PGM
 
 def pkl_reader(npy_file):
     with open(npy_file, 'rb') as f:
@@ -52,29 +57,37 @@ def video_snapshot(video_path, output_folder, start_second, end_second, interval
     return
 
 
+def data_prepare(annotation_path, Video_folder, map_save_path, YOLO_detect_path, vector_data_path, segment_num):
+    query_annotation_csv(annotation_path, segment_num, map_save_path)
+    train_dict = json.load(open(map_save_path))
+    yolo_dec = YOLO_detector(train_dict, Video_folder)
+    yolo_dec.extract_classes(YOLO_detect_path)
+    json_to_vectors(YOLO_detect_path, vector_data_path)
+    return
+
+def train_pipeline(train_data_path, validate_data_path, weight_save_path):
+    with open(train_data_path, 'rb') as f:
+        data = pickle.load(f)
+    train_data = np.array(data)
+    with open(validate_data_path, 'rb') as f:
+        data = pickle.load(f)
+    validate_data = np.array(data)
+    pgm = PGM(learning_rate=1e-5, regularization=1e-5, max_iter=10000)
+    weight = pgm.train_mln(train_data, weight_save_path, validate_data)
+    return 
 
 
-if __name__ == "__main__":
-    # # data = pkl_reader('train_vectors.pkl')
-    # train_action_counter = action_counter('train_detected_classes.json')
-    # print(train_action_counter)
-    # # compute each action's proportion
-    # total = sum(train_action_counter.values())
-    # for key in train_action_counter:
-    #     train_action_counter[key] /= total
-    
-    # prob = []
-    # for key in train_action_counter:
-    #     prob.append(train_action_counter[key])
+def test_pipeline(test_data_path, weight_save_path):
+    with open(test_data_path, 'rb') as f:
+        data = pickle.load(f)
         
-    # print(prob)
-    
-    video_path_root = 'Data/BDD-X/Videos/videos/'
-    output_folder = 'Data/video_snapshot'
-    
-    video = '2af58da3-c04e01b3.mov'
-    start = 0
-    end = 21
-    
-    video_path = os.path.join(video_path_root, video)
-    video_snapshot(video_path, output_folder, start, end)
+    test_data = np.array(data)
+    pgm = PGM(weight_path=weight_save_path)
+    accuracy = pgm.eval(test_data)
+    return accuracy
+
+def inference_pipeline(test_data, weight_save_path):
+    pgm = PGM(weight_path=weight_save_path)
+    prob, action_index = pgm.infer_action_probability(test_data)
+    return prob, action_index
+
