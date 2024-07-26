@@ -173,6 +173,22 @@ class PGM:
             
         return weights
     
+    def eval(self, test_data):
+        true_labels = np.argmax(test_data[:, :action_num], axis=1)
+        predictions = []
+        
+        for instance in test_data:
+            condition_input = instance[action_num:]
+            _, action_index = self.infer_action_probability(condition_input)
+            predictions.append(action_index)
+            
+        predictions = np.array(predictions)
+        
+        accuracy = compute_accuracy(true_labels, predictions)
+        
+        return accuracy
+
+    
     
     def infer_action_probability(self, condition_input):
         possible_instances = generate_possible_instances(condition_input)
@@ -194,17 +210,12 @@ class PGM:
         return probs, action_index
     
     
-    def eval(self, test_data):
-        true_labels = np.argmax(test_data[:, :action_num], axis=1)
-        predictions = []
-        
-        for instance in test_data:
-            condition_input = instance[action_num:]
-            _, action_index = self.infer_action_probability(condition_input)
-            predictions.append(action_index)
-            
-        predictions = np.array(predictions)
-        
-        accuracy = compute_accuracy(true_labels, predictions)
-        
-        return accuracy
+    def validate_instance(self, instance):
+        """
+        instance: np.array([...]) - Input data with action and condition combinations
+        """
+        violations = []
+        for idx, formula in enumerate(self.formulas):
+            if formula(instance) != 1:
+                violations.append(idx)
+        return violations
