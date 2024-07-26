@@ -155,15 +155,22 @@ class YOLO_detector:
         # Calculate the frame range for the specified time window
         start_frame = int(start_time * frame_rate)
         end_frame = int(end_time * frame_rate)
-        if start_frame >= total_frames or end_frame > total_frames or start_frame >= end_frame:
-            print("Invalid start_time or end_time")
+        if start_frame >= total_frames or end_frame > total_frames or start_frame > end_frame:
+            print("Invalid start_time or end_time, start:{}, end:{}, total:{}".format(start_frame, end_frame, total_frames))
             cap.release()
             return []
 
-        cap.set(cv2.CAP_PROP_POS_FRAMES, end_frame)
+        uni_samples = 8
+        step = max((end_frame - start_frame) // (uni_samples - 1), 1)
+        
+        sample_last_frame = start_frame + step * (uni_samples - 1)
+        
+        sample_end_frame = min(sample_last_frame, end_frame, total_frames - 1)
+        
+        cap.set(cv2.CAP_PROP_POS_FRAMES, sample_end_frame)
         ret, frame = cap.read()
         if not ret:
-            print("Failed to read the end frame")
+            print("Failed to read the end frame, total:{}, sample_end:{}".format(total_frames, sample_end_frame))
             cap.release()
             return []
 
