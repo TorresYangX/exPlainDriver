@@ -190,11 +190,12 @@ def map_classes_to_vector(classes):
     
     vector = [0] * predicate_num
     
-    for cls in classes:
-        if cls and cls in class_map:
-            index = class_map[cls]
-            if index is not None:
-                vector[index] = 1
+    if classes:
+        for cls in classes:
+            if cls and cls in class_map:
+                index = class_map[cls]
+                if index is not None:
+                    vector[index] = 1
     return vector
 
 def combine_vectors(action_vector, class_vector):
