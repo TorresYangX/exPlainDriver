@@ -2,36 +2,51 @@ import numpy as np
 import torch.nn.functional as F
 import torch
 
-action_num = 8
+action_num = 17
 condition_num = 13
 action_indices = list(range(action_num))
 
+# Keep, Accelerate, Decelerate, Stop, Reverse, MakeLeftTurn, MakeRightTurn, MakeUTurn, Merge, LeftPass, RightPass,(10) 
+# Yield, ChangeToLeftLane, ChangeToRightLane, ChangeToCenterLeftTurnLane, Park, PullOver(16)
+# SolidRedLight, SolidYellowLight, YellowLeftArrowLight,(19)
+# RedLeftArrowLight, MergingTrafficSign, WrongWaySign,(22)
+# NoLeftTurnSign, NoRightTurnSign, PedestrianCrossingSign, StopSign, RedYieldSign, DoNotPassSign, SlowSign(29)
 
-DECELAERATE = 0
-STOP = 1
-REVERSE = 2
-MAKE_LEFT_TURN = 3
-MAKE_RIGHT_TURN = 4
-MAKE_U_TURN = 5
-LEFT_PASS = 6
-RIGHT_PASS = 7
-SOLID_RED_LIGHT = 8
-SOLID_YELLOW_LIGHT = 9
-YELLOW_LEFT_ARROW_LIGHT = 10
-RED_LEFT_ARROW_LIGHT = 11
-MERGING_TRAFFIC_SIGN = 12
-WRONG_WAY_SIGN = 13
-NO_LEFT_TURN_SIGN = 14
-NO_RIGHT_TURN_SIGN = 15
-PEDESTRIAN_CROSSING_SIGN = 16
-STOP_SIGN = 17
-RED_YIELD_SIGN = 18
-DO_NOT_PASS_SIGN = 19
-SLOW_SIGN = 20
+KEEP = 0
+ACCELERATE = 1
+DECELAERATE = 2
+STOP = 3
+REVERSE = 4
+MAKE_LEFT_TURN = 5
+MAKE_RIGHT_TURN = 6
+MAKE_U_TURN = 7
+MERGE = 8
+LEFT_PASS = 9
+RIGHT_PASS = 10
+YIELD = 11
+CHANGE_TO_LEFT_LANE = 12
+CHANGE_TO_RIGHT_LANE = 13
+CHANGE_TO_CENTER_LEFT_TURN_LANE = 14
+PARK = 15
+PULL_OVER = 16
+SOLID_RED_LIGHT = 17
+SOLID_YELLOW_LIGHT = 18
+YELLOW_LEFT_ARROW_LIGHT = 19
+RED_LEFT_ARROW_LIGHT = 20
+MERGING_TRAFFIC_SIGN = 21
+WRONG_WAY_SIGN = 22
+NO_LEFT_TURN_SIGN = 23
+NO_RIGHT_TURN_SIGN = 24
+PEDESTRIAN_CROSSING_SIGN = 25
+STOP_SIGN = 26
+RED_YIELD_SIGN = 27
+DO_NOT_PASS_SIGN = 28
+SLOW_SIGN = 29
 
 
 def compute_interface_weights(p_i):
     return np.log(p_i / (1 - p_i))
+
 
 def compute_satisfaction(data, formulas):
     satisfaction_counts = np.zeros((len(data), len(formulas)))
@@ -40,27 +55,42 @@ def compute_satisfaction(data, formulas):
             satisfaction_counts[i, j] = formula(instance)
     return satisfaction_counts
 
+
 def log_sum_exp(x):
     max_x = np.max(x)
     return max_x + np.log(np.sum(np.exp(x - max_x)))
 
-def compute_log_likelihood(satisfaction_counts, weights, interface_weights, regularization):
-    weighted_sum = satisfaction_counts @ weights + interface_weights
+
+# def compute_log_likelihood(satisfaction_counts, weights, interface_weights, regularization):
+#     weighted_sum = satisfaction_counts @ weights + interface_weights
+#     log_likelihood = np.sum(weighted_sum) - log_sum_exp(weighted_sum)
+#     log_likelihood -= 0.5 * regularization * np.sum(weights ** 2)  # L2 regularize
+#     return log_likelihood
+
+
+def compute_log_likelihood(satisfaction_counts, weights, regularization):
+    weighted_sum = satisfaction_counts @ weights
     log_likelihood = np.sum(weighted_sum) - log_sum_exp(weighted_sum)
     log_likelihood -= 0.5 * regularization * np.sum(weights ** 2)  # L2 regularize
     return log_likelihood
 
-def update_weights(weights, satisfaction_counts, interface_weights, learning_rate, regularization):
-    weighted_sum = satisfaction_counts @ weights + interface_weights
+
+# def update_weights(weights, satisfaction_counts, interface_weights, learning_rate, regularization):
+#     weighted_sum = satisfaction_counts @ weights + interface_weights
+#     expected_satisfaction = np.exp(weighted_sum - log_sum_exp(weighted_sum))
+#     gradient = np.sum(satisfaction_counts, axis=0) - np.sum(expected_satisfaction[:, None] * satisfaction_counts, axis=0)
+#     gradient -= regularization * weights
+#     weights += learning_rate * gradient
+#     return weights
+
+def update_weights(weights, satisfaction_counts, learning_rate, regularization):
+    weighted_sum = satisfaction_counts @ weights
     expected_satisfaction = np.exp(weighted_sum - log_sum_exp(weighted_sum))
-    
     gradient = np.sum(satisfaction_counts, axis=0) - np.sum(expected_satisfaction[:, None] * satisfaction_counts, axis=0)
-    
     gradient -= regularization * weights
-    
     weights += learning_rate * gradient
-    
     return weights
+
 
 def generate_possible_instances(condition_input):
     possible_instances = []
@@ -70,6 +100,7 @@ def generate_possible_instances(condition_input):
         instance[action] = 1 
         possible_instances.append(instance)
     return np.array(possible_instances)
+
 
 def compute_accuracy(true_labels, predictions):
     return np.mean(true_labels == predictions)
@@ -81,26 +112,23 @@ class PGM:
         
         self.formulas = [
             
-            lambda args: 1 - args[SOLID_RED_LIGHT] + args[SOLID_RED_LIGHT] * args[STOP],  # SolidRedLight → Stop
-            lambda args: 1 - args[SOLID_YELLOW_LIGHT] + args[SOLID_YELLOW_LIGHT] * (args[STOP] + args[DECELAERATE] - args[STOP] * args[DECELAERATE]),  # SolidYellowLight → Stop ∨ Decelerate
+            lambda args: 1 - args[SOLID_RED_LIGHT] + args[SOLID_RED_LIGHT] * ((args[DECELAERATE] + args[STOP] - args[DECELAERATE] * args[STOP]) * (1 - args[ACCELERATE])),  # SolidRedLight → Decelerate ∨ Stop ∧ ¬Accelerate,
+            lambda args: 1 - args[SOLID_YELLOW_LIGHT] + args[SOLID_YELLOW_LIGHT] * ((args[STOP] + args[DECELAERATE] - args[STOP] * args[DECELAERATE]) * (1 - args[ACCELERATE])),  # SolidYellowLight → Stop ∨ Decelerate ∧ ¬Accelerate
             lambda args: 1 - args[YELLOW_LEFT_ARROW_LIGHT] + args[YELLOW_LEFT_ARROW_LIGHT] * (args[STOP] + args[DECELAERATE] - args[STOP] * args[DECELAERATE]),  # YellowLeftArrowLight → Stop ∨ Decelerate
-            lambda args: 1 - args[RED_LEFT_ARROW_LIGHT] + args[RED_LEFT_ARROW_LIGHT] * args[STOP] * (1 - (args[MAKE_LEFT_TURN] + args[MAKE_U_TURN] - args[MAKE_LEFT_TURN] * args[MAKE_U_TURN])),  # RedLeftArrowLight → Stop ∧ ¬(MakeLeftTurn ∨ MakeUTurn)
+            lambda args: 1 - args[RED_LEFT_ARROW_LIGHT] + args[RED_LEFT_ARROW_LIGHT] * (1 - (args[MAKE_LEFT_TURN] + args[MAKE_U_TURN] - args[MAKE_LEFT_TURN] * args[MAKE_U_TURN])),  # RedLeftArrowLight → ¬(MakeLeftTurn ∨ MakeUTurn)
             lambda args: 1 - args[MERGING_TRAFFIC_SIGN] + args[MERGING_TRAFFIC_SIGN] * args[DECELAERATE],  # MergingTrafficSign → Decelerate
             lambda args: 1 - args[WRONG_WAY_SIGN] + args[WRONG_WAY_SIGN] * (args[STOP] + args[MAKE_U_TURN] + args[REVERSE] - args[STOP] * args[MAKE_U_TURN] - args[STOP] * args[REVERSE] - args[MAKE_U_TURN] * args[REVERSE] + args[STOP] * args[MAKE_U_TURN] * args[REVERSE]),  # WrongWaySign → Stop ∨ Reverse ∨ MakeUTurn
             lambda args: 1 - args[NO_LEFT_TURN_SIGN] + args[NO_LEFT_TURN_SIGN] * (1 - args[MAKE_LEFT_TURN]),  # NoLeftTurnSign → ¬MakeLeftTurn
             lambda args: 1 - args[NO_RIGHT_TURN_SIGN] + args[NO_RIGHT_TURN_SIGN] * (1 - args[MAKE_RIGHT_TURN]),  # NoRightTurnSign → ¬MakeRightTurn
-            lambda args: 1 - args[PEDESTRIAN_CROSSING_SIGN] + args[PEDESTRIAN_CROSSING_SIGN] * (args[STOP] + args[DECELAERATE] - args[STOP] * args[DECELAERATE]),  # PedestrianCrossingSign → Decelerate ∨ Stop 
-            lambda args: 1 - args[STOP_SIGN] + args[STOP_SIGN] * args[STOP],  # StopSign → Stop
+            lambda args: 1 - args[PEDESTRIAN_CROSSING_SIGN] + args[PEDESTRIAN_CROSSING_SIGN] * (
+                            (args[DECELAERATE] + args[STOP] + args[KEEP] - args[DECELAERATE] * args[STOP] -
+                            args[DECELAERATE] * args[KEEP] - args[STOP] * args[KEEP] +
+                            args[DECELAERATE] * args[STOP] * args[KEEP]) * (1 - args[ACCELERATE])
+                            ),  # PedestrianCrossingSign → Decelerate ∨ Stop ∨ Keep ∧ ¬Accelerate
+            lambda args: 1 - args[STOP_SIGN] + args[STOP_SIGN] * ((args[STOP] + args[DECELAERATE] - args[STOP] * args[DECELAERATE]) * (1 - args[ACCELERATE])),  # StopSign → Decelerate ∨ Stop ∧ ¬Accelerate
             lambda args: 1 - args[RED_YIELD_SIGN] + args[RED_YIELD_SIGN] * args[DECELAERATE], # RedYieldSign → Decelerate
             lambda args: 1 - args[DO_NOT_PASS_SIGN] + args[DO_NOT_PASS_SIGN] * (1 - (args[LEFT_PASS] + args[RIGHT_PASS] - args[LEFT_PASS] * args[RIGHT_PASS])), # DoNotPassSign → ¬(LeftPass ∨ RightPass)
             lambda args: 1 - args[SLOW_SIGN] + args[SLOW_SIGN] * args[DECELAERATE] # SlowSign → Decelerate
-
-            
-            # lambda args: 1 - args[18] + args[18] * (args[1] + args[0] - args[1] * args[0]),  # SolidGreenLight → Accelerate ∨ Keep
-            # lambda args: 1 - args[24] * args[18] + args[24] * args[18] * args[7],  # IntersectionAhead ∧ SolidGreenLight → MakeUTurn
-            # lambda args: 1 - args[22] + args[22] * (args[5] + args[7] - args[5] * args[7]),  # GreenLeftArrowLight → MakeLeftTurn ∨ MakeUTurn
-            # lambda args: 1 - args[27] + args[27] * args[13],  # KeepRightSign → ChangeToRightLane
-            # lambda args: 1 - args[33] + args[33] * args[12],  # ThruTrafficMergeLeftSign → ChangeToLeftLane
         ]
         
         if weight_path:
@@ -128,18 +156,19 @@ class PGM:
         
         true_labels = np.argmax(data[:, :action_num], axis=1)
         
-        # compute interface weights
-        action_vector = data[:, :action_num]
-        action_prob = F.gumbel_softmax(torch.tensor(action_vector).float(), tau=self.temperature, hard=False).numpy()
-        max_prob = np.max(action_prob, axis=1)
-        interface_weights = np.clip(max_prob, 1e-6, 1 - 1e-6)
+        # # compute interface weights
+        # action_vector = data[:, :action_num]
+        # action_prob = F.gumbel_softmax(torch.tensor(action_vector).float(), tau=self.temperature, hard=False).numpy()
+        # max_prob = np.max(action_prob, axis=1)
+        # interface_weights = np.clip(max_prob, 1e-6, 1 - 1e-6)
         
         for iteration in range(self.max_iter):
             # Compute satisfaction counts
             satisfaction_counts = compute_satisfaction(data, self.formulas)
             
             # Compute log likelihood
-            log_likelihood = compute_log_likelihood(satisfaction_counts, weights, interface_weights, self.regularization)
+            # log_likelihood = compute_log_likelihood(satisfaction_counts, weights, interface_weights, self.regularization)
+            log_likelihood = compute_log_likelihood(satisfaction_counts, weights, self.regularization)
             print(f"Iteration {iteration}, Log Likelihood: {log_likelihood}")
             
             if np.abs(log_likelihood - prev_log_likelihood) < self.tol:
@@ -155,21 +184,31 @@ class PGM:
             avg_prob = np.mean(predictions_prob)
             print(f"Iteration {iteration}, Average Probability of Ground Truth Action: {avg_prob}")
             
-            if validation_data is not None:
-                acc = self.eval(validation_data)
-                print(f"Iteration {iteration}, Validation Score: {acc}")
-                if np.abs(acc - prev_acc) < self.tol:
-                    print("Validation score converged.")
-                    break
+            if np.abs(avg_prob - prev_acc) < self.tol:
+                print("Validation score converged.")
+                break
+            
+            if avg_prob > prev_acc:
+                prev_acc = avg_prob
+                np.save(saving_path, weights)
+                print(f"Saving weights at iteration {iteration}")
+            
+            # if validation_data is not None:
+            #     acc = self.eval(validation_data)
+            #     print(f"Iteration {iteration}, Validation Score: {acc}")
+            #     if np.abs(acc - prev_acc) < self.tol:
+            #         print("Validation score converged.")
+            #         break
             
             prev_log_likelihood = log_likelihood
-            weights = update_weights(weights, satisfaction_counts, interface_weights, self.learning_rate, self.regularization)
+            # weights = update_weights(weights, satisfaction_counts, interface_weights, self.learning_rate, self.regularization)
+            weights = update_weights(weights, satisfaction_counts, self.learning_rate, self.regularization)
             self.weights = weights
             # save best weights
-            if validation_data is not None and acc > prev_acc:
-                np.save(saving_path, weights)
-                prev_acc = acc
-                print(f"Saving weights at iteration {iteration}")
+            # if validation_data is not None and acc > prev_acc:
+            #     np.save(saving_path, weights)
+            #     prev_acc = acc
+            #     print(f"Saving weights at iteration {iteration}")
             
         return weights
     
@@ -191,17 +230,21 @@ class PGM:
     
     
     def infer_action_probability(self, condition_input):
+        
+        """
+        instance: np.array([...]) - conditions
+        """
+        
         possible_instances = generate_possible_instances(condition_input)
         satisfaction_counts = compute_satisfaction(possible_instances, self.formulas)
         
-        # generate interface weights
-        action_vector = possible_instances[:, :action_num]
-        action_prob = F.gumbel_softmax(torch.tensor(action_vector).float(), tau=self.temperature, hard=False).numpy()
-        max_prob = np.max(action_prob, axis=1)
-        interface_weights = np.clip(max_prob, 1e-6, 1 - 1e-6)
+        # # generate interface weights
+        # action_vector = possible_instances[:, :action_num]
+        # action_prob = F.gumbel_softmax(torch.tensor(action_vector).float(), tau=self.temperature, hard=False).numpy()
+        # interface_weights = np.sum(np.log(np.clip(action_prob, 1e-6, 1 - 1e-6)))
         
-        
-        log_probs = satisfaction_counts @ self.weights + interface_weights
+        # log_probs = satisfaction_counts @ self.weights + interface_weights
+        log_probs = satisfaction_counts @ self.weights
         max_log_probs = np.max(log_probs)
         stabilized_log_probs = log_probs - max_log_probs
         exp_probs = np.exp(stabilized_log_probs)
@@ -219,3 +262,9 @@ class PGM:
             if formula(instance) != 1:
                 violations.append(idx)
         return violations
+    
+    def compute_instance_probability(self, instance):
+        condition_input = instance[action_num:]
+        probs, _ = self.infer_action_probability(condition_input)
+        action_index = np.argmax(instance[:action_num])
+        return probs[action_index]
