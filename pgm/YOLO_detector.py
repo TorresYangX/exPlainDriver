@@ -188,8 +188,9 @@ class YOLO_detector:
         
         extracted_data = []
         
-        action_list=["Decelerate", "Stop", "Reverse", "MakeLeftTurn", 
-                     "MakeRightTurn", "MakeUTurn", "LeftPass", "RightPass"]
+        action_list=['Keep', 'Accelerate', 'Decelerate', 'Stop', 'Reverse', 
+                     'MakeLeftTurn', 'MakeRightTurn', 'MakeUTurn', 'Merge', 
+                     'LeftPass', 'RightPass']
         
         print('Extracting classes from YOLO...')
         
