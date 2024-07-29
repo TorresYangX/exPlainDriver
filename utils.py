@@ -1,12 +1,37 @@
-import pickle
-import json
-import cv2
 import os
+import cv2
+import json
+import torch
+import pickle
 import numpy as np
 from pgm.YOLO_detector import YOLO_detector
 from pgm.video_annotation import query_annotation_csv
 from pgm.predicate_map import json_to_vectors
 from pgm.PGM import PGM
+
+
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+model_path = "/home/xuanyang/data/Meta-Llama-3-8B-Instruct/"
+tokenizer = AutoTokenizer.from_pretrained(model_path)
+model = AutoModelForCausalLM.from_pretrained(model_path).to("cuda:2")
+
+def Llama3_map(action):
+    
+    prompt_1 = "The current behavior of the car:\n"
+    prompt_2 = "Which of the following actions most closely represents the current behavior of the car:\n"
+    prompt_3 = "Keep, Accelerate, Decelerate, Stop, Reverse, MakeLeftTurn, MakeRightTurn, MakeUTurn, Merge, LeftPass, RightPass, Yield, ChangeToLeftLane, ChangeToRightLane, ChangeToCenterLeftTurnLane, Park, PullOver.\n"
+    prompt_4 = "You must and can only choose one, and your answer needs to contain only your answer, without adding other explanations or extraneous content.\n"
+    prompt_5 = "Answer:"
+    input_text = prompt_1 + action + "\n" + prompt_2 + prompt_3 + prompt_4 + prompt_5
+    
+    inputs = tokenizer(input_text, return_tensors="pt").to("cuda:2")
+    with torch.no_grad():
+        outputs = model.generate(**inputs, max_new_tokens=4)
+    generated_token = outputs[0][len(inputs['input_ids'][0]):]
+    output_text = tokenizer.decode(generated_token, skip_special_tokens=True).strip()
+    return output_text
+
 
 def pkl_reader(npy_file):
     with open(npy_file, 'rb') as f:
@@ -58,10 +83,10 @@ def video_snapshot(video_path, output_folder, start_second, end_second, interval
 
 
 def data_prepare(annotation_path, Video_folder, map_save_path, YOLO_detect_path, vector_data_path, segment_num):
-    query_annotation_csv(annotation_path, segment_num, map_save_path)
-    train_dict = json.load(open(map_save_path))
-    yolo_dec = YOLO_detector(train_dict, Video_folder)
-    yolo_dec.extract_classes(YOLO_detect_path)
+    # query_annotation_csv(annotation_path, segment_num, map_save_path)
+    # train_dict = json.load(open(map_save_path))
+    # yolo_dec = YOLO_detector(train_dict, Video_folder)
+    # yolo_dec.extract_classes(YOLO_detect_path)
     json_to_vectors(YOLO_detect_path, vector_data_path)
     return
 
@@ -85,9 +110,4 @@ def test_pipeline(test_data_path, weight_save_path):
     pgm = PGM(weight_path=weight_save_path)
     accuracy = pgm.eval(test_data)
     return accuracy
-
-def inference_pipeline(test_data, weight_save_path):
-    pgm = PGM(weight_path=weight_save_path)
-    prob, action_index = pgm.infer_action_probability(test_data)
-    return prob, action_index
 
