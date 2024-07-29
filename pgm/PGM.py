@@ -264,7 +264,16 @@ class PGM:
         return violations
     
     def compute_instance_probability(self, instance):
-        condition_input = instance[action_num:]
-        probs, _ = self.infer_action_probability(condition_input)
-        action_index = np.argmax(instance[:action_num])
-        return probs[action_index]
+        """
+        Compute the probability of a given instance.
+
+        instance: np.array([...]) - Input data with action and condition combinations
+        """
+        # Compute satisfaction count for the given instance
+        satisfaction_count = np.array([formula(instance) for formula in self.formulas])
+        
+        # Calculate log probability for the given instance
+        log_prob = satisfaction_count @ self.weights
+        print(log_prob)
+        return np.exp(log_prob)
+        
