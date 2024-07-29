@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from pgm.PGM import PGM
 from tqdm import tqdm
-from utils import Llama3_map
+from utils import Llama3_map_action, update_action
 from pgm.YOLO_detector import detect_single_frame
 from pgm.predicate_map import segment_to_vector, map_classes_to_vector
 
@@ -18,13 +18,6 @@ def id2action(data, id):
         if item["id"] == id:
             return item['action'], item
     return None, None
-
-
-def update_action(action_list, action):
-    for act in action_list:
-        if act.lower() in action.lower():
-            return act
-    return action
 
 
 
@@ -50,8 +43,8 @@ def LLM_acc(LLM_result_path, ground_truth_info):
             correct += 1
             continue
         
-        LLM_action = Llama3_map(LLM_action_)
-        ground_action = Llama3_map(ground_action_)
+        LLM_action = Llama3_map_action(LLM_action_)
+        ground_action = Llama3_map_action(ground_action_)
         
         LLM_action = update_action(action_list, LLM_action)
         ground_action = update_action(action_list, ground_action)
@@ -106,8 +99,8 @@ def LLM_PGM_acc(weight_path, LLM_result_path, ground_truth_info, detection_resul
         LLM_action_ = LLM_action_.lower().strip()
         ground_action_ = ground_action_.lower().strip()
         
-        LLM_action = Llama3_map(LLM_action_)
-        ground_action = Llama3_map(ground_action_)
+        LLM_action = Llama3_map_action(LLM_action_)
+        ground_action = Llama3_map_action(ground_action_)
         LLM_action = update_action(action_list, LLM_action)
         ground_action = update_action(action_list, ground_action)
         
