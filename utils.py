@@ -4,33 +4,62 @@ import json
 import torch
 import pickle
 import numpy as np
-from pgm.YOLO_detector import YOLO_detector
-from pgm.video_annotation import query_annotation_csv
-from pgm.predicate_map import json_to_vectors
+from tqdm import tqdm
 from pgm.PGM import PGM
-
-
+from pgm.predicate_map import json_to_vectors
+from pgm.video_annotation import query_annotation_csv
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 model_path = "/home/xuanyang/data/Meta-Llama-3-8B-Instruct/"
 tokenizer = AutoTokenizer.from_pretrained(model_path)
 model = AutoModelForCausalLM.from_pretrained(model_path).to("cuda:2")
 
-def Llama3_map(action):
+def Llama3_map_action(action):
     
-    prompt_1 = "The current behavior of the car:\n"
+    prompt_1 = "The current behavior of the car: "
     prompt_2 = "Which of the following actions most closely represents the current behavior of the car:\n"
     prompt_3 = "Keep, Accelerate, Decelerate, Stop, Reverse, MakeLeftTurn, MakeRightTurn, MakeUTurn, Merge, LeftPass, RightPass, Yield, ChangeToLeftLane, ChangeToRightLane, ChangeToCenterLeftTurnLane, Park, PullOver.\n"
-    prompt_4 = "You must and can only choose one, and your answer needs to contain only your answer, without adding other explanations or extraneous content.\n"
+    # prompt_4 = "You must and can only choose one, and your answer needs to contain only your answer, without adding other explanations or extraneous content.\n"
+    prompt_4 = "You can choose as many actions as you want, as long as it's closest to the original behavior\n"
     prompt_5 = "Answer:"
     input_text = prompt_1 + action + "\n" + prompt_2 + prompt_3 + prompt_4 + prompt_5
-    
     inputs = tokenizer(input_text, return_tensors="pt").to("cuda:2")
     with torch.no_grad():
         outputs = model.generate(**inputs, max_new_tokens=4)
     generated_token = outputs[0][len(inputs['input_ids'][0]):]
     output_text = tokenizer.decode(generated_token, skip_special_tokens=True).strip()
     return output_text
+
+
+def update_action(action_list, action):
+    map_actions = set()
+    for act in action_list:
+        if act.lower() in action.lower():
+            map_actions.add(act)
+    return frozenset(map_actions)
+
+
+def action_predicate_count():
+    train_data = json.load(open('Data/video_process/conversation_bddx_train.json'))
+    action_list = ['Keep', 'Accelerate', 'Decelerate', 'Stop', 'Reverse', 'MakeLeftTurn', 'MakeRightTurn', 
+                   'MakeUTurn', 'Merge', 'LeftPass', 'RightPass', 'Yield', 'ChangeToLeftLane', 
+                   'ChangeToRightLane', 'ChangeToCenterLeftTurnLane', 'Park', 'PullOver']
+    
+    map_action_count = {}
+    
+    for item in tqdm(train_data):
+        action = item['conversations'][1]['value']
+        output = Llama3_map_action(action)
+        map_actions = update_action(action_list, output)
+        if map_actions in map_action_count:
+            map_action_count[map_actions] += 1
+        else:
+            map_action_count[map_actions] = 1
+    
+    for actions, count in map_action_count.items():
+        print(f"{set(actions)}: {count}")
+        
+    return map_action_count
 
 
 def pkl_reader(npy_file):
@@ -83,10 +112,11 @@ def video_snapshot(video_path, output_folder, start_second, end_second, interval
 
 
 def data_prepare(annotation_path, Video_folder, map_save_path, YOLO_detect_path, vector_data_path, segment_num):
+    from pgm.YOLO_detector import YOLO_detector
     # query_annotation_csv(annotation_path, segment_num, map_save_path)
-    # train_dict = json.load(open(map_save_path))
-    # yolo_dec = YOLO_detector(train_dict, Video_folder)
-    # yolo_dec.extract_classes(YOLO_detect_path)
+    train_dict = json.load(open(map_save_path))
+    yolo_dec = YOLO_detector(train_dict, Video_folder)
+    yolo_dec.extract_classes(YOLO_detect_path)
     json_to_vectors(YOLO_detect_path, vector_data_path)
     return
 
@@ -110,4 +140,13 @@ def test_pipeline(test_data_path, weight_save_path):
     pgm = PGM(weight_path=weight_save_path)
     accuracy = pgm.eval(test_data)
     return accuracy
+
+
+
+if __name__ == "__main__":
+    map_action_count = action_predicate_count()
+    with open('action_predicates_count.json', 'w') as f:
+        json.dump(map_action_count, f)
+        
+    
 
