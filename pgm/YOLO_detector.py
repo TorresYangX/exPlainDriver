@@ -6,28 +6,8 @@ import logging
 import numpy as np
 from tqdm import tqdm
 from ultralytics import YOLO
+from utils import Llama3_map
 logging.getLogger('ultralytics').setLevel(logging.ERROR)
-from transformers import AutoModelForCausalLM, AutoTokenizer
-
-model_path = "/home/xuanyang/data/Meta-Llama-3-8B-Instruct/"
-tokenizer = AutoTokenizer.from_pretrained(model_path)
-model = AutoModelForCausalLM.from_pretrained(model_path).to("cuda:2")
-
-def Llama3_map(action):
-    
-    prompt_1 = "The current behavior of the car:\n"
-    prompt_2 = "Which of the following actions most closely represents the current behavior of the car:\n"
-    prompt_3 = "Keep, Accelerate, Decelerate, Stop, Reverse, MakeLeftTurn, MakeRightTurn, MakeUTurn, Merge, LeftPass, RightPass, Yield, ChangeToLeftLane, ChangeToRightLane, ChangeToCenterLeftTurnLane, Park, PullOver.\n"
-    prompt_4 = "You must and can only choose one, and your answer needs to contain only your answer, without adding other explanations or extraneous content.\n"
-    prompt_5 = "Answer:"
-    input_text = prompt_1 + action + "\n" + prompt_2 + prompt_3 + prompt_4 + prompt_5
-    
-    inputs = tokenizer(input_text, return_tensors="pt").to("cuda:2")
-    with torch.no_grad():
-        outputs = model.generate(**inputs, max_new_tokens=4)
-    generated_token = outputs[0][len(inputs['input_ids'][0]):]
-    output_text = tokenizer.decode(generated_token, skip_special_tokens=True).strip()
-    return output_text
 
 
 def detect_single_frame(data_dict):
