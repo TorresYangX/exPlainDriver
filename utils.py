@@ -12,20 +12,31 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 model_path = "/home/xuanyang/data/Meta-Llama-3-8B-Instruct/"
 tokenizer = AutoTokenizer.from_pretrained(model_path)
-model = AutoModelForCausalLM.from_pretrained(model_path).to("cuda:2")
+model = AutoModelForCausalLM.from_pretrained(model_path).to("cuda:3")
 
 def Llama3_map_action(action):
     
-    prompt_1 = "The current behavior of the car: "
-    prompt_2 = "Which of the following actions most closely represents the current behavior of the car:\n"
-    prompt_3 = "Keep, Accelerate, Decelerate, Stop, Reverse, MakeLeftTurn, MakeRightTurn, MakeUTurn, Merge, LeftPass, RightPass, Yield, ChangeToLeftLane, ChangeToRightLane, ChangeToCenterLeftTurnLane, Park, PullOver.\n"
-    # prompt_4 = "You must and can only choose one, and your answer needs to contain only your answer, without adding other explanations or extraneous content.\n"
-    prompt_4 = "You can choose as many actions as you want, as long as it's closest to the original behavior\n"
-    prompt_5 = "Answer:"
-    input_text = prompt_1 + action + "\n" + prompt_2 + prompt_3 + prompt_4 + prompt_5
-    inputs = tokenizer(input_text, return_tensors="pt").to("cuda:2")
+    """
+    map action to predicates
+    """
+    
+    prompt = """Given the current behavior of the car, use one predicate or the combination of two predicates to best describe the behavior of the car. The predicates are: 
+    Keep, Accelerate, Decelerate, Stop, Reverse, MakeLeftTurn, MakeRightTurn, MakeUTurn, Merge, LeftPass, RightPass, Yield, ChangeToLeftLane, ChangeToRightLane, Park, PullOver.
+    Here are some examples:
+    #Current Behavior#: The car is travelling down the road.
+    #Predicates#: Keep\n
+    #Current Behavior#: The car is moving forward down the highway.
+    #Predicates#: Keep\n
+    #Current Behavior#: The car is slowing down and then comes to a stop.
+    #Predicates#: Decelerate, Stop\n
+    #Current Behavior#: The car is making a left turn an then accelerates.
+    #Predicates#: MakeLeftTurn, Accelerate\n
+    #Current Behavior#: {action}
+    #Predicates#: """.format(action=action)
+    
+    inputs = tokenizer(prompt, return_tensors="pt").to("cuda:3")
     with torch.no_grad():
-        outputs = model.generate(**inputs, max_new_tokens=4)
+        outputs = model.generate(**inputs, max_new_tokens=10)
     generated_token = outputs[0][len(inputs['input_ids'][0]):]
     output_text = tokenizer.decode(generated_token, skip_special_tokens=True).strip()
     return output_text
@@ -39,11 +50,44 @@ def update_action(action_list, action):
     return frozenset(map_actions)
 
 
+def LLM_compare_action(ground_action, pred_action):
+    """
+    directly compare the ground truth action and the predicted action
+    """
+    
+    prompt = '''Given the question and its corresponding ground answer, determine whether the response from the LLM aligns with the ground answer. Respond with 'Yes' if the response matches the ground answer or 'No' if it is incorrect.(If the response contains all ground answer and have more infomation, consider it correct). Here are examples:
+    #Question#: What is the action of ego car?
+    #Ground Answer#: The car is moving forward down the road.
+    #LLM Response#: The car moves forward then comes to a stop.
+    #Answer#: Yes\n
+    #Question#: What is the action of ego car?
+    #Ground Answer#: The car is travelling forward.
+    #LLM Response#: The car is driving forward with its windshield wipers on.
+    #Answer#: Yes\n
+    #Question#: What is the action of ego car?
+    #Ground Answer#: The car changes lanes.
+    #LLM Response#: The car is driving forward with its windshield wipers on.
+    #Answer#: No\n
+    #Question#: What is the action of ego car?
+    #Ground Answer#: {answer}
+    #LLM Response#: {response}
+    #Answer#:'''.format(answer=ground_action, response=pred_action)
+    
+    inputs = tokenizer(prompt, return_tensors="pt").to("cuda:3")
+    with torch.no_grad():
+        outputs = model.generate(**inputs, max_new_tokens=1)
+    generated_token = outputs[0][len(inputs['input_ids'][0]):]
+    output_text = tokenizer.decode(generated_token, skip_special_tokens=True).strip()
+    return output_text
+    
+    
+
+
 def action_predicate_count():
     train_data = json.load(open('Data/video_process/conversation_bddx_train.json'))
     action_list = ['Keep', 'Accelerate', 'Decelerate', 'Stop', 'Reverse', 'MakeLeftTurn', 'MakeRightTurn', 
                    'MakeUTurn', 'Merge', 'LeftPass', 'RightPass', 'Yield', 'ChangeToLeftLane', 
-                   'ChangeToRightLane', 'ChangeToCenterLeftTurnLane', 'Park', 'PullOver']
+                   'ChangeToRightLane', 'Park', 'PullOver']
     
     map_action_count = {}
     
@@ -55,7 +99,6 @@ def action_predicate_count():
             map_action_count[map_actions] += 1
         else:
             map_action_count[map_actions] = 1
-    
     for actions, count in map_action_count.items():
         print(f"{set(actions)}: {count}")
         
@@ -66,6 +109,7 @@ def pkl_reader(npy_file):
     with open(npy_file, 'rb') as f:
         data = pickle.load(f)
     return data
+
 
 def action_counter(json_path):
     data = json.load(open(json_path))
@@ -129,7 +173,7 @@ def train_pipeline(train_data_path, validate_data_path, weight_save_path):
     validate_data = np.array(data)
     pgm = PGM(learning_rate=1e-5, regularization=1e-5, max_iter=10000)
     weight = pgm.train_mln(train_data, weight_save_path, validate_data)
-    return 
+    return weight 
 
 
 def test_pipeline(test_data_path, weight_save_path):
@@ -142,11 +186,9 @@ def test_pipeline(test_data_path, weight_save_path):
     return accuracy
 
 
-
 if __name__ == "__main__":
-    map_action_count = action_predicate_count()
-    with open('action_predicates_count.json', 'w') as f:
-        json.dump(map_action_count, f)
-        
+    action = "The car is."
+    answer = Llama3_map_action(action)
+    print(answer)
     
 
