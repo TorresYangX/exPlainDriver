@@ -6,7 +6,7 @@ import logging
 import numpy as np
 from tqdm import tqdm
 from ultralytics import YOLO
-from utils import Llama3_map
+from utils import Llama3_map_action
 logging.getLogger('ultralytics').setLevel(logging.ERROR)
 
 
@@ -186,7 +186,7 @@ class YOLO_detector:
             if not yolo_results:
                 continue
             
-            answer = Llama3_map(item['action'])
+            answer = Llama3_map_action(item['action'])
             characters_to_remove = string.whitespace + string.punctuation
             answer = answer.strip(characters_to_remove)
             action = None
