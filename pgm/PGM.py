@@ -189,6 +189,7 @@ class PGM:
                 violations.append(idx)
         return violations
     
+    
     def compute_instance_probability(self, instance):
         """
         Compute the probability of a given instance.
