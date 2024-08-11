@@ -116,5 +116,4 @@ class BDDX:
     for i in index:
       violate_rule.append(self.nature_rule[i])
     return violate_rule
-      
             
