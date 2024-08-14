@@ -1,12 +1,6 @@
 import numpy as np
-import torch.nn.functional as F
 from pgm.config import *
-
-
-
-def compute_interface_weights(p_i):
-    return np.log(p_i / (1 - p_i))
-
+from scipy.special import softmax
 
 def compute_satisfaction(data, formulas):
     satisfaction_counts = np.zeros((len(data), len(formulas)))
@@ -21,27 +15,12 @@ def log_sum_exp(x):
     return max_x + np.log(np.sum(np.exp(x - max_x)))
 
 
-# def compute_log_likelihood(satisfaction_counts, weights, interface_weights, regularization):
-#     weighted_sum = satisfaction_counts @ weights + interface_weights
-#     log_likelihood = np.sum(weighted_sum) - log_sum_exp(weighted_sum)
-#     log_likelihood -= 0.5 * regularization * np.sum(weights ** 2)  # L2 regularize
-#     return log_likelihood
-
-
 def compute_log_likelihood(satisfaction_counts, weights, regularization):
     weighted_sum = satisfaction_counts @ weights
     log_likelihood = np.sum(weighted_sum) - log_sum_exp(weighted_sum)
     log_likelihood -= 0.5 * regularization * np.sum(weights ** 2)  # L2 regularize
     return log_likelihood
 
-
-# def update_weights(weights, satisfaction_counts, interface_weights, learning_rate, regularization):
-#     weighted_sum = satisfaction_counts @ weights + interface_weights
-#     expected_satisfaction = np.exp(weighted_sum - log_sum_exp(weighted_sum))
-#     gradient = np.sum(satisfaction_counts, axis=0) - np.sum(expected_satisfaction[:, None] * satisfaction_counts, axis=0)
-#     gradient -= regularization * weights
-#     weights += learning_rate * gradient
-#     return weights
 
 def update_weights(weights, satisfaction_counts, learning_rate, regularization):
     weighted_sum = satisfaction_counts @ weights
@@ -97,15 +76,8 @@ class PGM:
                
         true_labels = np.argmax(data[:, :self.action_num], axis=1)
         
-        # # compute interface weights
-        # action_vector = data[:, :action_num]
-        # action_prob = F.gumbel_softmax(torch.tensor(action_vector).float(), tau=self.temperature, hard=False).numpy()
-        # max_prob = np.max(action_prob, axis=1)
-        # interface_weights = np.clip(max_prob, 1e-6, 1 - 1e-6)
-        
         for iteration in range(self.max_iter):
             satisfaction_counts = compute_satisfaction(data, self.formulas)
-            # log_likelihood = compute_log_likelihood(satisfaction_counts, weights, interface_weights, self.regularization)
             log_likelihood = compute_log_likelihood(satisfaction_counts, weights, self.regularization)
             predictions_prob = []
             for instance in data:
@@ -132,7 +104,6 @@ class PGM:
                 print(f"Saving weights at iteration {iteration}")
                   
             prev_log_likelihood = log_likelihood
-            # weights = update_weights(weights, satisfaction_counts, interface_weights, self.learning_rate, self.regularization)
             weights = update_weights(weights, satisfaction_counts, self.learning_rate, self.regularization)
             self.weights = weights
         return weights
@@ -141,40 +112,24 @@ class PGM:
     def eval(self, test_data):
         true_labels = np.argmax(test_data[:, :self.action_num], axis=1)
         predictions = []
-        
         for instance in test_data:
             condition_input = instance[self.action_num:]
             _, action_index = self.infer_action_probability(condition_input)
             predictions.append(action_index)
-            
         predictions = np.array(predictions)
-        
         accuracy = compute_accuracy(true_labels, predictions)
-        
         return accuracy
 
     
     
     def infer_action_probability(self, condition_input):
-        
         """
         instance: np.array([...]): conditions
         """
-        
         possible_instances = generate_possible_instances(condition_input, self.action_num, self.condition_num)
         satisfaction_counts = compute_satisfaction(possible_instances, self.formulas)
-        
-        # # generate interface weights
-        # action_vector = possible_instances[:, :action_num]
-        # action_prob = F.gumbel_softmax(torch.tensor(action_vector).float(), tau=self.temperature, hard=False).numpy()
-        # interface_weights = np.sum(np.log(np.clip(action_prob, 1e-6, 1 - 1e-6)))
-        
-        # log_probs = satisfaction_counts @ self.weights + interface_weights
         log_probs = satisfaction_counts @ self.weights
-        max_log_probs = np.max(log_probs)
-        stabilized_log_probs = log_probs - max_log_probs
-        exp_probs = np.exp(stabilized_log_probs)
-        probs = exp_probs / np.sum(exp_probs)
+        probs = softmax(log_probs)
         action_index = np.argmax(probs)
         return probs, action_index
     
@@ -193,13 +148,9 @@ class PGM:
     def compute_instance_probability(self, instance):
         """
         Compute the probability of a given instance.
-
         instance: np.array([...]): Input data with action and condition combinations
         """
-        # Compute satisfaction count for the given instance
-        satisfaction_count = np.array([formula(instance) for formula in self.formulas])
-        
-        # Calculate log probability for the given instance
-        log_prob = satisfaction_count @ self.weights
-        return np.exp(log_prob)
+        condition_input = instance[self.action_num:]
+        probs, _ = self.infer_action_probability(condition_input)
+        return probs[instance[:self.action_num].argmax()]
         
