@@ -6,7 +6,7 @@ import logging
 import numpy as np
 from tqdm import tqdm
 from ultralytics import YOLO
-from utils import Llama3_map_action
+from utils import gpt_map_action, Llama3_map_action
 logging.getLogger('ultralytics').setLevel(logging.ERROR)
 
 
@@ -170,7 +170,8 @@ class YOLO_detector:
         
         action_list=['Keep', 'Accelerate', 'Decelerate', 'Stop', 'Reverse', 
                      'MakeLeftTurn', 'MakeRightTurn', 'MakeUTurn', 'Merge', 
-                     'LeftPass', 'RightPass']
+                     'LeftPass', 'RightPass', 'Yield', 'ChangeToLeftLane',
+                     'ChangeToRightLane', 'Park', 'PullOver']
         
         print('Extracting classes from YOLO...')
         
@@ -180,11 +181,7 @@ class YOLO_detector:
             start_time = item['start_time']
             end_time = item['end_time']
             
-            # yolo_results = self.get_yolo_results_for_segment(video_path, start_time, end_time)
             yolo_results = self.get_yolo_results_for_last_frame(video_path, start_time, end_time)
-            
-            if not yolo_results:
-                continue
             
             answer = Llama3_map_action(item['action'])
             characters_to_remove = string.whitespace + string.punctuation
@@ -194,9 +191,6 @@ class YOLO_detector:
                 if act.lower() in answer.lower():
                     action = act
                     break
-                
-            if action is None:
-                continue
             
             extracted_data.append({
                 'id': item['id'],
@@ -205,8 +199,8 @@ class YOLO_detector:
                 'classes': yolo_results
             })
         
-        with open(save_path, 'w') as f:
-            json.dump(extracted_data, f, indent=4)
+            with open(save_path, 'w') as f:
+                json.dump(extracted_data, f, indent=4)
   
         return extracted_data
     
