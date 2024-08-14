@@ -8,7 +8,7 @@ from tqdm import tqdm
 # RedLeftArrowLight, MergingTrafficSign, WrongWaySign,(22)
 # NoLeftTurnSign, NoRightTurnSign, PedestrianCrossingSign, StopSign, RedYieldSign, DoNotPassSign, SlowSign(29)
 
-predicate_num = 30
+predicate_num = 29
 
 action_map = {
     "Keep": 0,
@@ -25,30 +25,27 @@ action_map = {
     "Yield": 11,
     "ChangeToLeftLane": 12,
     "ChangeToRightLane": 13,
-    "ChangeToCenterLeftTurnLane": 14,
-    "Park": 15,
-    "PullOver": 16
+    "Park": 14,
+    "PullOver": 15
 }
 
 class_map = {
-    "stop traffic light": 17, 
-    "warning": 18, 
-    "warning traffic light": 18, 
-    "warning left": 19, 
-    "warning left traffic light": 19, 
-    "stop left": 20, 
-    "stop left traffic light": 20, 
-    "merge": 21,
-    "doNotEnter": 22,
-    "noLeftTurn": 23,
-    "noRightTurn": 24,
-    "pedestrianCrossing": 25,
-    "stop": 26,
-    "stopAhead": 26,
-    "yield": 27,
-    "yieldAhead": 27,
-    "doNotPass": 28,
-    "slow": 29,
+    "stop traffic light": 16, 
+    "warning": 17, 
+    "warning traffic light": 17, 
+    "warning left": 18, 
+    "warning left traffic light": 18, 
+    "stop left": 19, 
+    "stop left traffic light": 19, 
+    "merge": 20,
+    "noLeftTurn": 21,
+    "noRightTurn": 22,
+    "pedestrianCrossing": 23,
+    "stop": 24,
+    "stopAhead": 24,
+    "yield": 25,
+    "yieldAhead": 25,
+    "slow": 26,
     
     "intersection": None,
     "addedLane": None,
@@ -105,9 +102,7 @@ def map_action_to_vector(action):
     return vector
 
 def map_classes_to_vector(classes):
-    
     vector = [0] * predicate_num
-    
     if classes:
         for cls in classes:
             if cls and cls in class_map:
@@ -126,9 +121,7 @@ def segment_to_vector(segment):
     return combine_vectors(action_vector, class_vector)
 
 def json_to_vectors(YOLO_detect_path, train_data_savePth):
-    
     data = json.load(open(YOLO_detect_path))
-    
     vectors = []
     for item in tqdm(data):
         vector = segment_to_vector(item)
