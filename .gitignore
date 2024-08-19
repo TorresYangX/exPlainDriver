@@ -1,4 +1,3 @@
-Data/
 *.json
 *.pt
 *.pkl
@@ -7,3 +6,5 @@ Data/
 
 __pycache__/
 test_case/
+Data/
+results/
