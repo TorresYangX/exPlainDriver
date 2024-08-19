@@ -8,7 +8,7 @@ from tqdm import tqdm
 # RedLeftArrowLight, MergingTrafficSign, WrongWaySign,(22)
 # NoLeftTurnSign, NoRightTurnSign, PedestrianCrossingSign, StopSign, RedYieldSign, DoNotPassSign, SlowSign(29)
 
-predicate_num = 29
+predicate_num = 36
 
 action_map = {
     "Keep": 0,
@@ -46,6 +46,9 @@ class_map = {
     "yield": 25,
     "yieldAhead": 25,
     "slow": 26,
+    "go": 27,
+    "go forward": 27,
+    "go forward traffic light": 27,
     
     "intersection": None,
     "addedLane": None,
@@ -53,9 +56,6 @@ class_map = {
     "laneEnds": None,
     "thruMergeLeft": None,
     "thruTrafficMergeLeft": None,
-    "go": None,
-    "go forward": None,
-    "go forward traffic light": None,
     "go left": None,
     "go left traffic light": None,
     "curveLeft": None,
@@ -89,6 +89,17 @@ class_map = {
     "zoneAhead25": None,
     "zoneAhead45": None
 }
+
+cs_map = {
+    "Keep": 28,
+    "Accelerate": 29,
+    "Decelerate": 30,
+    "Stop": 31,
+    "Reverse": 32,
+    "Straight": 33,
+    "Left": 34,
+    "Right": 35,
+}
     
 
 def map_action_to_vector(action):
@@ -111,14 +122,23 @@ def map_classes_to_vector(classes):
                     vector[index] = 1
     return vector
 
-def combine_vectors(action_vector, class_vector):
-    combined_vector = [max(a, c) for a, c in zip(action_vector, class_vector)]
+def map_cs_to_vector(velocity, direction):
+    vector = [0] * predicate_num
+    if velocity and direction:
+        vector[cs_map[direction]] = 1
+        vector[cs_map[velocity]] = 1
+    return vector
+
+
+def combine_vectors(action_vector, class_vector, cs_vector):
+    combined_vector = [max(a, c, cs) for a, c, cs in zip(action_vector, class_vector, cs_vector)]
     return combined_vector
 
 def segment_to_vector(segment):
     action_vector = map_action_to_vector(segment["action"])
     class_vector = map_classes_to_vector(segment["classes"])
-    return combine_vectors(action_vector, class_vector)
+    cs_vector = map_cs_to_vector(segment["velocity_predicate"], segment["direction_predicate"])
+    return combine_vectors(action_vector, class_vector, cs_vector)
 
 def json_to_vectors(YOLO_detect_path, train_data_savePth):
     data = json.load(open(YOLO_detect_path))

@@ -6,7 +6,7 @@ import logging
 import numpy as np
 from tqdm import tqdm
 from ultralytics import YOLO
-from utils import gpt_map_action, Llama3_map_action
+from utils import gpt_map_action, Llama3_map_action, cs_extractor, gpt_map_cs, update_action
 logging.getLogger('ultralytics').setLevel(logging.ERROR)
 
 
@@ -165,38 +165,37 @@ class YOLO_detector:
     
     
     def extract_classes(self, save_path):
-        
         extracted_data = []
-        
         action_list=['Keep', 'Accelerate', 'Decelerate', 'Stop', 'Reverse', 
                      'MakeLeftTurn', 'MakeRightTurn', 'MakeUTurn', 'Merge', 
                      'LeftPass', 'RightPass', 'Yield', 'ChangeToLeftLane',
                      'ChangeToRightLane', 'Park', 'PullOver']
         
-        print('Extracting classes from YOLO...')
+        cs_info = json.load(open('Data/video_process/new_conversation_bddx_eval.json'))
         
         for item in tqdm(self.dict):
-            
             video_path = item['original_video']
             start_time = item['start_time']
             end_time = item['end_time']
-            
             yolo_results = self.get_yolo_results_for_last_frame(video_path, start_time, end_time)
-            
-            answer = Llama3_map_action(item['action'])
+            answer = gpt_map_action(item['action'], isPred=False)
             characters_to_remove = string.whitespace + string.punctuation
             answer = answer.strip(characters_to_remove)
             action = None
-            for act in action_list:
-                if act.lower() in answer.lower():
-                    action = act
-                    break
+            action = update_action(action_list, answer)
+            cs_data = cs_extractor(item['id'], cs_info)
+            ca_predicate = gpt_map_cs(cs_data['Speed'], cs_data['Curvature'], cs_data['Acceleration'], cs_data['Course'])
+            velocity_predicate = update_action(['Keep', 'Accelerate', 'Decelerate', 'Stop', 'Reverse'], ca_predicate)
+            direction_predicate = update_action(['Straight', 'Left', 'Right'], ca_predicate)
             
             extracted_data.append({
                 'id': item['id'],
                 'video': video_path,
                 'action': action,
-                'classes': yolo_results
+                'velocity_predicate': velocity_predicate,
+                'direction_predicate': direction_predicate,
+                'classes': yolo_results,
+                'cs': cs_data,
             })
         
             with open(save_path, 'w') as f:
