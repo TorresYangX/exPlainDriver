@@ -49,13 +49,13 @@ def compute_accuracy(true_labels, predictions):
 
 class PGM:
     
-    def __init__(self, config, weight_path=None, learning_rate=0.01, max_iter=100, tol=1e-6, regularization=0.01, temperature=0.3):
+    def __init__(self, config, weights=None, learning_rate=0.01, max_iter=100, tol=1e-6, regularization=0.01):
         self.formulas = config.formulas
         self.action_num = config.action_num
         self.condition_num = config.condition_num
         
-        if weight_path:
-            self.weights = np.load(weight_path)
+        if weights is not None:
+            self.weights = weights
         else:
             self.weights = np.ones(len(self.formulas))
         
@@ -63,7 +63,6 @@ class PGM:
         self.max_iter = max_iter
         self.tol = tol
         self.regularization = regularization
-        self.temperature = temperature
         
 
     def train_mln(self, data, saving_path):
