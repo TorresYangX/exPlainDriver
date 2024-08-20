@@ -1,3 +1,5 @@
+import numpy as np
+
 class BDDX:
   def __init__(self):
     self.predicate = {
@@ -61,27 +63,11 @@ class BDDX:
       lambda args: args[self.predicate["CHANGE_TO_RIGHT_LANE"]], # CHANGE_TO_RIGHT_LANE
       lambda args: args[self.predicate["PARK"]], # PARK
       lambda args: args[self.predicate["PULL_OVER"]], # PULL_OVER
-      # lambda args: 1 - args[self.predicate["SOLID_RED_LIGHT"]] + args[self.predicate["SOLID_RED_LIGHT"]] * \
-      #                 ((args[self.predicate["KEEP"]] + args[self.predicate["DECELERATE"]] + args[self.predicate["STOP"]] - \
-      #                   args[self.predicate["KEEP"]] * args[self.predicate["DECELERATE"]] - \
-      #                   args[self.predicate["KEEP"]] * args[self.predicate["STOP"]] - \
-      #                   args[self.predicate["DECELERATE"]] * args[self.predicate["STOP"]] + \
-      #                   args[self.predicate["KEEP"]] * args[self.predicate["DECELERATE"]] * args[self.predicate["STOP"]]) * \
-      #                   (1 - args[self.predicate["ACCELERATE"]])), # SolidRedLight → Keep ∨ Decelerate ∨ Stop ∧ ¬Accelerate,
       
       lambda args: 1 - args[self.predicate["SOLID_RED_LIGHT"]] + args[self.predicate["SOLID_RED_LIGHT"]] * \
                       ((1 - args[self.predicate["ACCELERATE"]]) * \
                        (1 - args[self.predicate["PULL_OVER"]]) * \
                        (1 - args[self.predicate["PARK"]])), # SolidRedLight → ¬Accelerate ∧ ¬PullOver ∧ ¬Park
-
-      
-      # lambda args: 1 - args[self.predicate["SOLID_YELLOW_LIGHT"]] + args[self.predicate["SOLID_YELLOW_LIGHT"]] * \
-      #                 ((args[self.predicate["KEEP"]] + args[self.predicate["STOP"]] + args[self.predicate["DECELERATE"]] - \
-      #                   args[self.predicate["KEEP"]] * args[self.predicate["STOP"]] - \
-      #                   args[self.predicate["KEEP"]] * args[self.predicate["DECELERATE"]] - \
-      #                   args[self.predicate["STOP"]] * args[self.predicate["DECELERATE"]] + \
-      #                   args[self.predicate["KEEP"]] * args[self.predicate["STOP"]] * args[self.predicate["DECELERATE"]]) * \
-      #                   (1 - args[self.predicate["ACCELERATE"]])), # SolidYellowLight → Keep ∨ Stop ∨ Decelerate ∧ ¬Accelerate
       
       lambda args: 1 - args[self.predicate["SOLID_YELLOW_LIGHT"]] + args[self.predicate["SOLID_YELLOW_LIGHT"]] * \
                       ((args[self.predicate["MAKE_LEFT_TURN"]] + \
@@ -121,38 +107,12 @@ class BDDX:
       lambda args: 1 - args[self.predicate["NO_RIGHT_TURN_SIGN"]] + args[self.predicate["NO_RIGHT_TURN_SIGN"]] * \
                       (1 - args[self.predicate["MAKE_RIGHT_TURN"]]),  # NoRightTurnSign → ¬MakeRightTurn
 
-      # lambda args: 1 - args[self.predicate["PEDESTRIAN_CROSSING_SIGN"]] + args[self.predicate["PEDESTRIAN_CROSSING_SIGN"]] * \
-      #                 ((args[self.predicate["DECELERATE"]] + args[self.predicate["STOP"]] + args[self.predicate["KEEP"]] - \
-      #                 args[self.predicate["DECELERATE"]] * args[self.predicate["STOP"]] - \
-      #                 args[self.predicate["DECELERATE"]] * args[self.predicate["KEEP"]] - \
-      #                 args[self.predicate["STOP"]] * args[self.predicate["KEEP"]] + \
-      #                 args[self.predicate["DECELERATE"]] * args[self.predicate["STOP"]] * args[self.predicate["KEEP"]]) * \
-      #                 (1 - args[self.predicate["ACCELERATE"]])),  # PedestrianCrossingSign → Decelerate ∨ Stop ∨ Keep ∧ ¬Accelerate
-      
-      # lambda args: 1 - args[self.predicate["PEDESTRIAN_CROSSING_SIGN"]] + args[self.predicate["PEDESTRIAN_CROSSING_SIGN"]] * \
-      #                 (1 - args[self.predicate["ACCELERATE"]]), # PedestrianCrossingSign → ¬Accelerate
-
-      # lambda args: 1 - args[self.predicate["STOP_SIGN"]] + args[self.predicate["STOP_SIGN"]] * \
-      #                 ((args[self.predicate["KEEP"]] + args[self.predicate["STOP"]] + args[self.predicate["DECELERATE"]] - \
-      #                   args[self.predicate["KEEP"]] * args[self.predicate["STOP"]] - \
-      #                   args[self.predicate["KEEP"]] * args[self.predicate["DECELERATE"]] - \
-      #                   args[self.predicate["STOP"]] * args[self.predicate["DECELERATE"]] + \
-      #                   args[self.predicate["KEEP"]] * args[self.predicate["STOP"]] * args[self.predicate["DECELERATE"]]) * \
-      #                   (1 - args[self.predicate["ACCELERATE"]])), # StopSign → Keep ∨ Decelerate ∨ Stop ∧ ¬Accelerate
-      
-      # lambda args: 1 - args[self.predicate["STOP_SIGN"]] + args[self.predicate["STOP_SIGN"]] * \
-      #                 (1 - args[self.predicate["ACCELERATE"]]), # StopSign → ¬Accelerate
-
       lambda args: 1 - args[self.predicate["RED_YIELD_SIGN"]] + args[self.predicate["RED_YIELD_SIGN"]] * \
                       args[self.predicate["DECELERATE"]],  # RedYieldSign → Decelerate
 
       lambda args: 1 - args[self.predicate["SLOW_SIGN"]] + args[self.predicate["SLOW_SIGN"]] * \
                       (1 - args[self.predicate["ACCELERATE"]]),  # SlowSign → ¬Accelerate
                       
-      # lambda args: 1 - args[self.predicate["SOLID_GREEN_LIGHT"]] + args[self.predicate["SOLID_GREEN_LIGHT"]] * \
-      #                 (args[self.predicate["KEEP"]] + args[self.predicate["ACCELERATE"]] - \
-      #                  args[self.predicate["KEEP"]] * args[self.predicate["ACCELERATE"]]), # SolidGreenLight → Keep ∨ Accelerate
-
       lambda args: 1 - args[self.predicate["KEEP_CS"]] + args[self.predicate["KEEP_CS"]] * \
                       args[self.predicate["KEEP"]],  # KEEP_CS → Keep
 
@@ -164,6 +124,18 @@ class BDDX:
                       
       lambda args: 1 - args[self.predicate["STOP_CS"]] + args[self.predicate["STOP_CS"]] * \
                       args[self.predicate["STOP"]],  # STOP_CS → Stop
+                      
+      lambda args: 1 - args[self.predicate["REVERSE_CS"]] + args[self.predicate["REVERSE_CS"]] * \
+                      args[self.predicate["REVERSE"]],  # REVERSE_CS → REVERSE
+      
+      lambda args: 1 - args[self.predicate["LEFT_CS"]] + args[self.predicate["LEFT_CS"]] * \
+                      (args[self.predicate["MAKE_LEFT_TURN"]] + args[self.predicate["CHANGE_TO_LEFT_LANE"]] - \
+                       args[self.predicate["MAKE_LEFT_TURN"]] * args[self.predicate["CHANGE_TO_LEFT_LANE"]]),  # LEFT_CS → MakeLeftTurn ∨ ChangeToLeftLane
+      
+      lambda args: 1 - args[self.predicate["RIGHT_CS"]] + args[self.predicate["RIGHT_CS"]] * \
+                      (args[self.predicate["MAKE_RIGHT_TURN"]] + args[self.predicate["CHANGE_TO_RIGHT_LANE"]] - \
+                       args[self.predicate["MAKE_RIGHT_TURN"]] * args[self.predicate["CHANGE_TO_RIGHT_LANE"]]),  # RIGHT_CS → MakeRightTurn ∨ ChangeToRightLane
+
       
       
       # lambda args: 1 - args[self.predicate["KEEP_CS"]] + args[self.predicate["KEEP_CS"]] * \
@@ -181,16 +153,13 @@ class BDDX:
       # lambda args: 1 - args[self.predicate["STOP_CS"]] + args[self.predicate["STOP_CS"]] * \
       #                 (args[self.predicate["DECELERATE"]] + args[self.predicate["STOP"]] - \
       #                  args[self.predicate["DECELERATE"]] * args[self.predicate["STOP"]]),#STOP_CS → DECELERATE ∨ Stop
+      
+      # lambda args: 1 - args[self.predicate["LEFT_CS"]] + args[self.predicate["LEFT_CS"]] * \
+      #                 args[self.predicate["MAKE_LEFT_TURN"]],  # LEFT_CS → MakeLeftTurn
                       
-      lambda args: 1 - args[self.predicate["REVERSE_CS"]] + args[self.predicate["REVERSE_CS"]] * \
-                      args[self.predicate["REVERSE"]],  # REVERSE_CS → REVERSE
+      # lambda args: 1 - args[self.predicate["RIGHT_CS"]] + args[self.predicate["RIGHT_CS"]] * \
+      #                 args[self.predicate["MAKE_RIGHT_TURN"]],  # RIGHT_CS → MakeRightTurn  
                       
-      lambda args: 1 - args[self.predicate["LEFT_CS"]] + args[self.predicate["LEFT_CS"]] * \
-                      args[self.predicate["MAKE_LEFT_TURN"]],  # LEFT_CS → MakeLeftTurn
-                      
-      lambda args: 1 - args[self.predicate["RIGHT_CS"]] + args[self.predicate["RIGHT_CS"]] * \
-                      args[self.predicate["MAKE_RIGHT_TURN"]],  # RIGHT_CS → MakeRightTurn  
-
     ]
     
     self.nature_rule=[
@@ -212,7 +181,84 @@ class BDDX:
     for i in index:
       violate_rule.append(self.nature_rule[i])
     return violate_rule
-    
+  
+  
+  def generate_compliant_data(self):
+    data = []
+    for rule in self.formulas:
+        args = np.zeros(self.action_num+self.condition_num)
+        if "MAKE_LEFT_TURN" in rule.__code__.co_consts:
+            args[self.predicate["MAKE_LEFT_TURN"]] = 1
+        elif "MAKE_RIGHT_TURN" in rule.__code__.co_consts:
+            args[self.predicate["MAKE_RIGHT_TURN"]] = 1
+        else:
+            args[np.random.choice(list(range(16)))] = 1
+        condition_indices = [i for name, i in self.predicate.items() if name in rule.__code__.co_consts and i >= 16 and i < 28]
+        print(condition_indices)
+        if condition_indices:
+          for index in condition_indices:
+              args[index] = 1
+        args[np.random.choice(list(range(28, 33)))] = 1
+        args[np.random.choice(list(range(34, 36)))] = 1
+        
+        if rule(args):
+            data.append(list(args))
+    return data
+  
+  
+  def generate_noncompliant_data(self):
+    data = []
+    while len(data) < len(self.formulas):
+        args = np.zeros(self.action_num+self.condition_num)
+        args[np.random.choice(list(range(16)))] = 1
+        selected_conditions = np.random.choice(list(range(16, 28)), np.random.randint(0, 3), replace=False)
+        for index in selected_conditions:
+            args[index] = 1
+        args[np.random.choice(list(range(28, 33)))] = 1
+        args[np.random.choice(list(range(34, 36)))] = 1
+        if not any(rule(args) for rule in self.formulas):
+            data.append(args)
+    return data
+  
+  
+  def generate_dataset(self, total_samples, real_data, positive_rate=0.8):
+    num_compliant = int(total_samples * positive_rate)  # 80% synthetic positive samples
+    num_noncompliant = total_samples - num_compliant  # 20% synthetic negative samples
+
+    # Generate synthetic compliant data
+    compliant_data = []
+    while len(compliant_data) < num_compliant:
+        compliant_data.extend(self.generate_compliant_data())
+        if len(compliant_data) > num_compliant:
+            compliant_data = compliant_data[:num_compliant]
+
+    # Generate synthetic noncompliant data
+    noncompliant_data = []
+    while len(noncompliant_data) < num_noncompliant:
+        noncompliant_data.extend(self.generate_noncompliant_data())
+        if len(noncompliant_data) > num_noncompliant:
+            noncompliant_data = noncompliant_data[:num_noncompliant]
+
+    # Perturb real_data to create real noncompliant data
+    perturbed_real_data = []
+    for sample in real_data:
+        if np.random.rand() < 1-positive_rate:
+            perturbed_sample = sample.copy()
+            action_indices = list(range(16))  # Indices corresponding to action predicates
+            current_action_index = np.argmax(perturbed_sample[action_indices])  # Find current action
+            perturbed_sample[current_action_index] = 0  # Set the current action to 0
+            remaining_actions = action_indices.copy()
+            remaining_actions.remove(current_action_index)  # Remove the current action index from the list
+            new_action_index = np.random.choice(remaining_actions)  # Select a new action index randomly
+            perturbed_sample[new_action_index] = 1  # Set the new action
+            perturbed_real_data.append(perturbed_sample)
+
+    # Combine synthetic data with real data
+    pos_dataset = compliant_data + real_data 
+    neg_dataset = noncompliant_data + perturbed_real_data
+    np.random.shuffle(pos_dataset)  # Shuffle the combined dataset
+    np.random.shuffle(neg_dataset)
+    return pos_dataset, neg_dataset
 
     
             

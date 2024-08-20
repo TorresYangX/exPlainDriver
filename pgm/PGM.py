@@ -65,7 +65,7 @@ class PGM:
         self.regularization = regularization
         
 
-    def train_mln(self, data, saving_path):
+    def train_mln(self, pos_data, neg_data, saving_path):
         """
         data: np.array([...])
         """   
@@ -73,32 +73,40 @@ class PGM:
         prev_log_likelihood = -np.inf
         prev_acc = -np.inf
                
-        true_labels = np.argmax(data[:, :self.action_num], axis=1)
+        data = np.concatenate((pos_data, neg_data), axis=0)
+        true_labels = np.argmax(pos_data[:, :self.action_num], axis=1)
+        neg_labels = np.argmax(neg_data[:, :self.action_num], axis=1)   
         
         for iteration in range(self.max_iter):
             satisfaction_counts = compute_satisfaction(data, self.formulas)
             log_likelihood = compute_log_likelihood(satisfaction_counts, weights, self.regularization)
-            predictions_prob = []
-            for instance in data:
+            pos_predictions_prob = []
+            neg_predictions_prob = []
+            for instance in pos_data:
                 condition_input = instance[self.action_num:]
                 action_probs, _ = self.infer_action_probability(condition_input)
-                predictions_prob.append(action_probs[true_labels[len(predictions_prob)]])
+                pos_predictions_prob.append(action_probs[true_labels[len(pos_predictions_prob)]])
+            for instance in neg_data:
+                condition_input = instance[self.action_num:]
+                action_probs, _ = self.infer_action_probability(condition_input)
+                neg_predictions_prob.append(action_probs[neg_labels[len(neg_predictions_prob)]])
         
-            avg_prob = np.mean(predictions_prob)
-            print(f"Iteration {iteration}, Average Probability of Ground Truth Action: {avg_prob}, Log Likelihood: {log_likelihood}")
+            pos_avg_prob = np.mean(pos_predictions_prob)
+            neg_avg_prob = np.mean(neg_predictions_prob)
+            print(f"Iteration {iteration},\nAverage Probability of Postive Ground Truth Action: {pos_avg_prob},\nAverage Probability of Negative Ground Truth Action: {neg_avg_prob},\nLog Likelihood: {log_likelihood}")
                     
             if np.abs(log_likelihood - prev_log_likelihood) < self.tol:
                 np.save(saving_path, weights)
                 print("log likelihood converged.")
                 break
             
-            if np.abs(avg_prob - prev_acc) < self.tol:
+            if np.abs(pos_avg_prob - prev_acc) < self.tol:
                 np.save(saving_path, weights)
                 print("accuracy converged.")
                 break
             
-            if avg_prob > prev_acc:
-                prev_acc = avg_prob
+            if pos_avg_prob > prev_acc:
+                prev_acc = pos_avg_prob
                 np.save(saving_path, weights)
                 print(f"Saving weights at iteration {iteration}")
                   
