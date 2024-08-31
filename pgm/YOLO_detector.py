@@ -6,7 +6,7 @@ import logging
 import numpy as np
 from tqdm import tqdm
 from ultralytics import YOLO
-from utils import gpt_map_action, Llama3_map_action, cs_extractor, gpt_map_cs, update_action
+from utils import gpt_map_action, cs_extractor, gpt_map_cs, update_action, update_action_set
 logging.getLogger('ultralytics').setLevel(logging.ERROR)
 
 
@@ -121,6 +121,9 @@ class YOLO_detector:
     
     # detect from last frame
     def get_yolo_results_for_last_frame(self, video_index, start_time, end_time):
+        if start_time == None or end_time == None:
+            print("Invalid start_time or end_time:{}".format(video_index))
+            return []
         try:
             start_time = float(start_time)
             end_time = float(end_time)
@@ -163,35 +166,31 @@ class YOLO_detector:
         return list(yolo_results)
 
     
-    
     def extract_classes(self, save_path):
         extracted_data = []
         action_list=['Keep', 'Accelerate', 'Decelerate', 'Stop', 'Reverse', 
                      'MakeLeftTurn', 'MakeRightTurn', 'MakeUTurn', 'Merge', 
                      'LeftPass', 'RightPass', 'Yield', 'ChangeToLeftLane',
                      'ChangeToRightLane', 'Park', 'PullOver']
-        
-        cs_info = json.load(open('Data/video_process/new_conversation_bddx_eval.json'))
-        
+        cs_info = json.load(open('Data/video_process/new_conversation_bddx_train.json'))
         for item in tqdm(self.dict):
             video_path = item['original_video']
             start_time = item['start_time']
             end_time = item['end_time']
             yolo_results = self.get_yolo_results_for_last_frame(video_path, start_time, end_time)
-            answer = gpt_map_action(item['action'], isPred=False)
+            answer = gpt_map_action(item['action'])
             characters_to_remove = string.whitespace + string.punctuation
             answer = answer.strip(characters_to_remove)
-            action = None
-            action = update_action(action_list, answer)
+            actions = update_action_set(action_list, answer)
             cs_data = cs_extractor(item['id'], cs_info)
             ca_predicate = gpt_map_cs(cs_data['Speed'], cs_data['Curvature'], cs_data['Acceleration'], cs_data['Course'])
             velocity_predicate = update_action(['Keep', 'Accelerate', 'Decelerate', 'Stop', 'Reverse'], ca_predicate)
             direction_predicate = update_action(['Straight', 'Left', 'Right'], ca_predicate)
-            
             extracted_data.append({
                 'id': item['id'],
                 'video': video_path,
-                'action': action,
+                'ori_action': item['action'],
+                'action': actions,
                 'velocity_predicate': velocity_predicate,
                 'direction_predicate': direction_predicate,
                 'classes': yolo_results,
