@@ -259,6 +259,60 @@ class BDDX:
     np.random.shuffle(pos_dataset)  # Shuffle the combined dataset
     np.random.shuffle(neg_dataset)
     return pos_dataset, neg_dataset
+  
+
+def balance_dataset(dataset, action_num, target_ratio=0.1):
+    """
+    Balance the dataset by ensuring each action appears with a target ratio.
+
+    Parameters:
+    - dataset: List of numpy arrays representing the dataset where each instance has actions and conditions.
+    - action_num: Total number of action predicates.
+    - target_ratio: Target ratio for each action in the dataset (default is 0.1).
+
+    Returns:
+    - Balanced dataset as a list of numpy arrays.
+    """
+
+    # Convert dataset to numpy array for easier processing
+    dataset = np.array(dataset)
+
+    # Count the occurrences of each action
+    action_counts = np.zeros(action_num)
+    for instance in dataset:
+        action_indices = list(range(action_num))
+        action_counts += instance[action_indices]
+
+    # Calculate target number of samples for each action
+    total_samples = len(dataset)
+    target_counts = total_samples * target_ratio
+
+    # Create a dictionary to store indices for each action
+    action_indices_dict = {i: [] for i in range(action_num)}
+    for index, instance in enumerate(dataset):
+        action_indices = list(range(action_num))
+        for action_index in action_indices:
+            if instance[action_index] == 1:
+                action_indices_dict[action_index].append(index)
+
+    # Create balanced dataset
+    balanced_dataset = []
+    for action_index in range(action_num):
+        indices = action_indices_dict[action_index]
+        if len(indices) < target_counts:
+            # Need to oversample
+            additional_indices = np.random.choice(indices, int(target_counts - len(indices)), replace=True)
+            balanced_dataset.extend(dataset[indices + additional_indices])
+        else:
+            # Need to undersample
+            sampled_indices = np.random.choice(indices, int(target_counts), replace=False)
+            balanced_dataset.extend(dataset[sampled_indices])
+
+    # Shuffle the balanced dataset
+    balanced_dataset = np.array(balanced_dataset)
+    np.random.shuffle(balanced_dataset)
+
+    return balanced_dataset.tolist()
 
     
             
