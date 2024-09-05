@@ -102,14 +102,16 @@ cs_map = {
 }
     
 
-def map_action_to_vector(action):
+def map_action_to_vector(action_list):
     
     vector = [0] * predicate_num
     
     # if action is not None
-    if action and action in action_map:
-        index = action_map[action]
-        vector[index] = 1
+    if action_list:
+        for action in action_list:
+            if action in action_map:
+                index = action_map[action]
+                vector[index] = 1
     return vector
 
 def map_classes_to_vector(classes):
@@ -147,6 +149,5 @@ def json_to_vectors(YOLO_detect_path, train_data_savePth):
         vector = segment_to_vector(item)
         vectors.append(vector)
     with open(train_data_savePth, "wb") as f:
-        pickle.dump(vectors, f)
-        
+        pickle.dump(vectors, f)  
     return
