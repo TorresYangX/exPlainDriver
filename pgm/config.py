@@ -113,17 +113,31 @@ class BDDX:
       lambda args: 1 - args[self.predicate["SLOW_SIGN"]] + args[self.predicate["SLOW_SIGN"]] * \
                       (1 - args[self.predicate["ACCELERATE"]]),  # SlowSign → ¬Accelerate
                       
+      # lambda args: 1 - args[self.predicate["KEEP_CS"]] + args[self.predicate["KEEP_CS"]] * \
+      #                 args[self.predicate["KEEP"]],  # KEEP_CS → Keep
+      
       lambda args: 1 - args[self.predicate["KEEP_CS"]] + args[self.predicate["KEEP_CS"]] * \
-                      args[self.predicate["KEEP"]],  # KEEP_CS → Keep
+                      (args[self.predicate["KEEP"]] + args[self.predicate["ACCELERATE"]]),  # KEEP_CS → KEEP ∨ ACCELERATE
 
+
+      # lambda args: 1 - args[self.predicate["ACCELERATE_CS"]] + args[self.predicate["ACCELERATE_CS"]] * \
+      #                 args[self.predicate["ACCELERATE"]],  # ACCELERATE_CS → Accelerate
+      
       lambda args: 1 - args[self.predicate["ACCELERATE_CS"]] + args[self.predicate["ACCELERATE_CS"]] * \
-                      args[self.predicate["ACCELERATE"]],  # ACCELERATE_CS → Accelerate
+                      (args[self.predicate["KEEP"]] + args[self.predicate["ACCELERATE"]]),  # ACCELERATE_CS → KEEP ∨ ACCELERATE
+
                       
+      # lambda args: 1 - args[self.predicate["DECELERATE_CS"]] + args[self.predicate["DECELERATE_CS"]] * \
+      #                 args[self.predicate["DECELERATE"]],  # DECELERATE_CS → DECELERATE
+      
       lambda args: 1 - args[self.predicate["DECELERATE_CS"]] + args[self.predicate["DECELERATE_CS"]] * \
-                      args[self.predicate["DECELERATE"]],  # DECELERATE_CS → DECELERATE
+                      (args[self.predicate["DECELERATE"]] + args[self.predicate["STOP"]]),  # DECELERATE_CS → DECELERATE ∨ STOP
                       
+      # lambda args: 1 - args[self.predicate["STOP_CS"]] + args[self.predicate["STOP_CS"]] * \
+      #                 args[self.predicate["STOP"]],  # STOP_CS → Stop
+      
       lambda args: 1 - args[self.predicate["STOP_CS"]] + args[self.predicate["STOP_CS"]] * \
-                      args[self.predicate["STOP"]],  # STOP_CS → Stop
+                      (args[self.predicate["DECELERATE"]] + args[self.predicate["STOP"]]),  # STOP_CS → DECELERATE ∨ STOP
                       
       lambda args: 1 - args[self.predicate["REVERSE_CS"]] + args[self.predicate["REVERSE_CS"]] * \
                       args[self.predicate["REVERSE"]],  # REVERSE_CS → REVERSE
@@ -134,32 +148,7 @@ class BDDX:
       
       lambda args: 1 - args[self.predicate["RIGHT_CS"]] + args[self.predicate["RIGHT_CS"]] * \
                       (args[self.predicate["MAKE_RIGHT_TURN"]] + args[self.predicate["CHANGE_TO_RIGHT_LANE"]] - \
-                       args[self.predicate["MAKE_RIGHT_TURN"]] * args[self.predicate["CHANGE_TO_RIGHT_LANE"]]),  # RIGHT_CS → MakeRightTurn ∨ ChangeToRightLane
-
-      
-      
-      # lambda args: 1 - args[self.predicate["KEEP_CS"]] + args[self.predicate["KEEP_CS"]] * \
-      #                 (args[self.predicate["KEEP"]] + args[self.predicate["ACCELERATE"]] - \
-      #                  args[self.predicate["KEEP"]] * args[self.predicate["ACCELERATE"]]),# KEEP_CS → Keep ∨ Accelerate
-                      
-      # lambda args: 1 - args[self.predicate["ACCELERATE_CS"]] + args[self.predicate["ACCELERATE_CS"]] * \
-      #                 (args[self.predicate["KEEP"]] + args[self.predicate["ACCELERATE"]] - \
-      #                  args[self.predicate["KEEP"]] * args[self.predicate["ACCELERATE"]]),# ACCELERATE_CS → Keep ∨ Accelerate
-      
-      # lambda args: 1 - args[self.predicate["DECELERATE_CS"]] + args[self.predicate["DECELERATE_CS"]] * \
-      #                 (args[self.predicate["DECELERATE"]] + args[self.predicate["STOP"]] - \
-      #                  args[self.predicate["DECELERATE"]] * args[self.predicate["STOP"]]),#DECELERATE_CS → DECELERATE ∨ Stop
-                      
-      # lambda args: 1 - args[self.predicate["STOP_CS"]] + args[self.predicate["STOP_CS"]] * \
-      #                 (args[self.predicate["DECELERATE"]] + args[self.predicate["STOP"]] - \
-      #                  args[self.predicate["DECELERATE"]] * args[self.predicate["STOP"]]),#STOP_CS → DECELERATE ∨ Stop
-      
-      # lambda args: 1 - args[self.predicate["LEFT_CS"]] + args[self.predicate["LEFT_CS"]] * \
-      #                 args[self.predicate["MAKE_LEFT_TURN"]],  # LEFT_CS → MakeLeftTurn
-                      
-      # lambda args: 1 - args[self.predicate["RIGHT_CS"]] + args[self.predicate["RIGHT_CS"]] * \
-      #                 args[self.predicate["MAKE_RIGHT_TURN"]],  # RIGHT_CS → MakeRightTurn  
-                      
+                       args[self.predicate["MAKE_RIGHT_TURN"]] * args[self.predicate["CHANGE_TO_RIGHT_LANE"]]),  # RIGHT_CS → MakeRightTurn ∨ ChangeToRightLane                 
     ]
     
     self.nature_rule=[
@@ -313,6 +302,47 @@ def balance_dataset(dataset, action_num, target_ratio=0.1):
     np.random.shuffle(balanced_dataset)
 
     return balanced_dataset.tolist()
+  
+  
+class DriveLM:
+  def __init__(self):
+    self.predicate = {
+      'KEEP': 0,
+      'ACCELERATE': 1,
+      'DECELERATE': 2,
+      'STOP': 3,
+      'MAKE_LEFT_TURN': 4,
+      'MAKE_RIGHT_TURN': 5,
+      'CHANGE_TO_LEFT_LANE': 6,
+      'CHANGE_TO_RIGHT_LANE': 7,
+      
+      'SOLID_RED_LIGHT': 8,
+      'SOLID_YELLOW_LIGHT': 9,
+      'YELLOW_LEFT_ARROW_LIGHT': 10,
+      'RED_LEFT_ARROW_LIGHT': 11,
+      'MERGING_TRAFFIC_SIGN': 12,
+      'NO_LEFT_TURN_SIGN': 13,
+      'NO_RIGHT_TURN_SIGN': 14,
+      'PEDESTRIAN_CROSSING_SIGN': 15,
+      'STOP_SIGN': 16,
+      'RED_YIELD_SIGN': 17,
+      'SLOW_SIGN': 18,
+      'SOLID_GREEN_LIGHT': 19,
+      
+      'STOP_LINE': 20,
+      'DOUBLE_DASHED_WHITE_LINE_LEFT': 21,
+      'DOUBLE_DASHED_WHITE_LINE_RIGHT': 22,
+      'SINGLE_SOLID_WHITE_LINE_LEFT': 23,
+      'SINGLE_SOLID_WHITE_LINE_RIGHT': 24,
+      'DOUBLE_SOLID_WHITE_LINE_LEFT': 25,
+      'DOUBLE_SOLID_WHITE_LINE_RIGHT': 26,
+      'SINGLE_ZIGZAG_WHITE_LINE_LEFT': 27,
+      'SINGLE_ZIGZAG_WHITE_LINE_RIGHT': 28,
+      'SINGLE_SOLID_YELLOW_LINE_LEFT': 29,
+      'SINGLE_SOLID_YELLOW_LINE_RIGHT': 30,
+    }
+      
+  
 
     
             
