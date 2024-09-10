@@ -27,7 +27,7 @@ def predicate_judge(action_list, ground_action_list):
 def LLM_PGM_acc(weights, config, detection_result):
     pgm = PGM(weights=weights, config=config)
     yolo_detect_Test = json.load(open(detection_result)) 
-    model_type = "kl"
+    model_type = "rag"
     LLM_result_predicate = json.load(open(f'result/{model_type}/LLM_result_predicate_{model_type}.json'))
     base_predicate = json.load(open(f'result/vanilla/LLM_result_predicate_vanilla.json'))
     total = 0
@@ -136,8 +136,6 @@ def LLM_PGM_acc(weights, config, detection_result):
 
 if __name__ == "__main__":
     yolo_detect_Test_path = 'process_data/test/test_detected_classes.json'
-    ground_truth_path = 'process_data/test/map_ann_test.json'
-    wrong_case_file = 'test_case/wrong_case_vanilla_PGM.json'
     
     weights = np.array([
         15.51559968,  15.07370472, 15.73000304, 15.45839886,  12.28816603,  12.93708945,
@@ -145,15 +143,14 @@ if __name__ == "__main__":
         12.65637727,  12.51229441,  12.08004540,  12.19210990, 30.65301903, 12.03725726,
         15.06927711, 15.06927711, 15.06927711, 15.06927711, 15.06927711, 
         34.89316792,
-        # 34.66902898, 
-        # 15.06927711, 
         15.06927711, 
-        # 30.89316803, 
-        5.00000000, 5.00000000,
-        5.00000000, 5.00000000, 
+    
+        2.00000000, 2.00000000,
+        2.00000000, 2.00000000, 
         10.00000000,
         10.00000000, 10.00000000
     ]) 
+    
     LLM_PGM_acc(weights, BDDX(), yolo_detect_Test_path)
     
         
