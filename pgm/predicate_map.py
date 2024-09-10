@@ -2,12 +2,6 @@ import json
 import pickle
 from tqdm import tqdm
 
-# Keep, Accelerate, Decelerate, Stop, Reverse, MakeLeftTurn, MakeRightTurn, MakeUTurn, Merge, LeftPass, RightPass,(10) 
-# Yield, ChangeToLeftLane, ChangeToRightLane, ChangeToCenterLeftTurnLane, Park, PullOver(16)
-# SolidRedLight, SolidYellowLight, YellowLeftArrowLight,(19)
-# RedLeftArrowLight, MergingTrafficSign, WrongWaySign,(22)
-# NoLeftTurnSign, NoRightTurnSign, PedestrianCrossingSign, StopSign, RedYieldSign, DoNotPassSign, SlowSign(29)
-
 predicate_num = 36
 
 action_map = {
