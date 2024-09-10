@@ -172,7 +172,7 @@ class YOLO_detector:
                      'MakeLeftTurn', 'MakeRightTurn', 'MakeUTurn', 'Merge', 
                      'LeftPass', 'RightPass', 'Yield', 'ChangeToLeftLane',
                      'ChangeToRightLane', 'Park', 'PullOver']
-        cs_info = json.load(open('Data/video_process/new_conversation_bddx_eval.json'))
+        cs_info = json.load(open('Data/video_process/new_conversation_bddx_test.json'))
         for item in tqdm(self.dict):
             video_path = item['original_video']
             start_time = item['start_time']
