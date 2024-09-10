@@ -3,6 +3,7 @@ import os
 import cv2
 import json
 import torch
+import string
 import pickle
 import numpy as np
 from tqdm import tqdm
@@ -157,7 +158,6 @@ def action_predicate_count():
     
     with open('map_action_count.json', 'w') as f:
         json.dump(map_action_count, f)
-    
     return map_action_count
 
 
@@ -182,18 +182,14 @@ def action_counter(json_path):
 def video_snapshot(video_path, output_folder, start_second, end_second, interval=1):
     video_name = video_path.split('/')[-1].split('.')[0] + str(start_second) + '_' + str(end_second)
     output_path = os.path.join(output_folder, video_name)
-    
     if not os.path.exists(output_path):
         os.makedirs(output_path)
-           
     cap = cv2.VideoCapture(video_path)    
     fps = cap.get(cv2.CAP_PROP_FPS)    
     start_frame = start_second * fps
     end_frame = end_second * fps
-        
     frame_count = 0
     image_count = start_second
-    
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
@@ -206,7 +202,6 @@ def video_snapshot(video_path, output_folder, start_second, end_second, interval
                 image_count += 1
             
         frame_count += 1
-        
     cap.release()
     return
 
@@ -224,7 +219,26 @@ def cs_extractor(id, cs_info):
                 data[key] = values
             break
     return data
-            
+
+
+def map_LLM_pred(LLM_result_path, save_path):
+    action_list=['Keep', 'Accelerate', 'Decelerate', 'Stop', 'Reverse', 
+                'MakeLeftTurn', 'MakeRightTurn', 'MakeUTurn', 'Merge', 
+                'LeftPass', 'RightPass', 'Yield', 'ChangeToLeftLane',
+                'ChangeToRightLane', 'Park', 'PullOver']
+    LLM_result = json.load(open(LLM_result_path))
+    extract_result = []
+    for item in tqdm(LLM_result):
+        id = item['image_id']
+        action = item['caption']
+        answer = gpt_map_action(action)
+        characters_to_remove = string.whitespace + string.punctuation
+        answer = answer.strip(characters_to_remove)
+        predicate = update_action_set(action_list, answer)
+        extract_result.append({'id': id, 'action': action, 'predicate': predicate})
+        with open(save_path, 'w') as f:
+            json.dump(extract_result, f)
+    return
 
 
 def data_prepare(annotation_path, Video_folder, map_save_path, YOLO_detect_path, vector_data_path, segment_num):
@@ -233,7 +247,7 @@ def data_prepare(annotation_path, Video_folder, map_save_path, YOLO_detect_path,
     train_dict = json.load(open(map_save_path))
     yolo_dec = YOLO_detector(train_dict, Video_folder)
     yolo_dec.extract_classes(YOLO_detect_path)
-    # json_to_vectors(YOLO_detect_path, vector_data_path)
+    json_to_vectors(YOLO_detect_path, vector_data_path)
     return
 
 
@@ -254,10 +268,3 @@ def test_pipeline(test_data_path, weight_save_path):
     pgm = PGM(weight_path=weight_save_path)
     accuracy = pgm.eval(test_data)
     return accuracy
-    
-        
-        
-                
-        
-    
-
