@@ -2,7 +2,7 @@ import json
 import pickle
 from tqdm import tqdm
 
-predicate_num = 31
+predicate_num = 32
 
 action_map = {
     "Keep": 0,
@@ -13,40 +13,41 @@ action_map = {
     "MakeRightTurn": 5,
     "ChangeToLeftLane": 6,
     "ChangeToRightLane": 7,
+    "Straight": 8,
 }
 
 class_map = {
-    "stop traffic light": 8, 
-    "warning": 9, 
-    "warning traffic light": 9, 
-    "warning left": 10, 
-    "warning left traffic light": 10, 
-    "stop left": 11, 
-    "stop left traffic light": 11, 
-    "merge": 12,
-    "noLeftTurn": 13,
-    "noRightTurn": 14,
-    "pedestrianCrossing": 15,
-    "stop": 16,
-    "stopAhead": 16,
-    "yield": 17,
-    "yieldAhead": 17,
-    "slow": 18,
-    "go": 19,
-    "go forward": 19,
-    "go forward traffic light": 19,
+    "stop traffic light": 9, 
+    "warning": 10, 
+    "warning traffic light": 10, 
+    "warning left": 11, 
+    "warning left traffic light": 11, 
+    "stop left": 12, 
+    "stop left traffic light": 12, 
+    "merge": 13,
+    "noLeftTurn": 14,
+    "noRightTurn": 15,
+    "pedestrianCrossing": 16,
+    "stop": 17,
+    "stopAhead": 17,
+    "yield": 18,
+    "yieldAhead": 18,
+    "slow": 19,
+    "go": 20,
+    "go forward": 20,
+    "go forward traffic light": 20,
     
-    'stopLine': 20,
-    'DOUBLE_DASHED_WHITE_LEFT': 21,
-    'DOUBLE_DASHED_WHITE_RIGHT': 22,
-    'SINGLE_SOLID_WHITE_LEFT': 23,
-    'SINGLE_SOLID_WHITE_RIGHT': 24,
-    'DOUBLE_SOLID_WHITE_LEFT': 25,
-    'DOUBLE_SOLID_WHITE_RIGHT': 26,
-    'SINGLE_ZIGZAG_WHITE_LEFT': 27,
-    'SINGLE_ZIGZAG_WHITE_RIGHT': 28,
-    'SINGLE_SOLID_YELLOW_LEFT': 29,
-    'SINGLE_SOLID_YELLOW_RIGHT': 30,
+    'stopLine': 21,
+    'DOUBLE_DASHED_WHITE_LEFT': 22,
+    'DOUBLE_DASHED_WHITE_RIGHT': 23,
+    'SINGLE_SOLID_WHITE_LEFT': 24,
+    'SINGLE_SOLID_WHITE_RIGHT': 25,
+    'DOUBLE_SOLID_WHITE_LEFT': 26,
+    'DOUBLE_SOLID_WHITE_RIGHT': 27,
+    'SINGLE_ZIGZAG_WHITE_LEFT': 28,
+    'SINGLE_ZIGZAG_WHITE_RIGHT': 29,
+    'SINGLE_SOLID_YELLOW_LEFT': 30,
+    'SINGLE_SOLID_YELLOW_RIGHT': 31,
     
     
     "intersection": None,
@@ -129,20 +130,21 @@ def json_to_vectors(YOLO_detect_path, train_data_savePth):
     for item in tqdm(data):
         vector = segment_to_vector(item)
         vectors.append(vector)
+    print(len(vectors), len(vectors[0]))
     with open(train_data_savePth, "wb") as f:
         pickle.dump(vectors, f)  
     return
 
 if __name__ == "__main__":
-    # YOLO_detect_path = "process_data_drivelm/train/train_detected_classes.json"
+    YOLO_detect_path = "process_data_drivelm/test/test_detected_classes.json"
     train_data_savePth = "process_data_drivelm/test/test_vectors.pkl"
-    # json_to_vectors(YOLO_detect_path, train_data_savePth)
+    json_to_vectors(YOLO_detect_path, train_data_savePth)
     
-    condition_vector_path = "process_data_drivelm/test/test_condition_vectors.pkl"
-    train_vectors = pickle.load(open(train_data_savePth, "rb"))
-    print(len(train_vectors), len(train_vectors[0]))
-    condition_vectors = [row[8:] for row in train_vectors]
-    print(len(condition_vectors), len(condition_vectors[0]))
-    with open(condition_vector_path, "wb") as f:
-        pickle.dump(condition_vectors, f)
+    # condition_vector_path = "process_data_drivelm/test/test_condition_vectors.pkl"
+    # train_vectors = pickle.load(open(train_data_savePth, "rb"))
+    # print(len(train_vectors), len(train_vectors[0]))
+    # condition_vectors = [row[8:] for row in train_vectors]
+    # print(len(condition_vectors), len(condition_vectors[0]))
+    # with open(condition_vector_path, "wb") as f:
+    #     pickle.dump(condition_vectors, f)
     

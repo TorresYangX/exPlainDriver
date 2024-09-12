@@ -13,8 +13,8 @@ def action_map(sentence):
         r'driving slowly': 'Decelerate',
         r'driving with normal speed': 'Keep',
         r'not moving': 'Stop',
-        r'slightly steering to the left': 'ChangeToLeftLine',
-        r'slightly steering to the right': 'ChangeToRightLine',
+        r'slightly steering to the left': 'ChangeToLeftLane',
+        r'slightly steering to the right': 'ChangeToRightLane',
         r'steering to the right': 'MakeRightTurn',
         r'steering to the left': 'MakeLeftTurn',
     }

@@ -7,7 +7,8 @@ import string
 import pickle
 import numpy as np
 from tqdm import tqdm
-from pgm.PGM import PGM
+# from pgm.PGM import PGM
+from pgm.PGM_drivelm import PGM
 from openai import OpenAI
 from pgm.predicate_map import json_to_vectors
 from pgm.video_annotation import query_annotation_csv
