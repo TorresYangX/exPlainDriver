@@ -307,125 +307,110 @@ def balance_dataset(dataset, action_num, target_ratio=0.1):
 class DriveLM:
   def __init__(self):
     self.predicate = {
-      'KEEP': 0,
-      'ACCELERATE': 1,
-      'DECELERATE': 2,
+      'NORMAL': 0,
+      'FAST': 1,
+      'SLOW': 2,
       'STOP': 3,
-      'MAKE_LEFT_TURN': 4,
-      'MAKE_RIGHT_TURN': 5,
-      'CHANGE_TO_LEFT_LANE': 6,
-      'CHANGE_TO_RIGHT_LANE': 7,
-      'STRAIGHT': 8,
+      'LEFT': 4,
+      'RIGHT': 5,
+      'STRAIGHT': 6,
       
-      'SOLID_RED_LIGHT': 9,
-      'SOLID_YELLOW_LIGHT': 10,
-      'YELLOW_LEFT_ARROW_LIGHT': 11,
-      'RED_LEFT_ARROW_LIGHT': 12,
-      'MERGING_TRAFFIC_SIGN': 13,
-      'NO_LEFT_TURN_SIGN': 14,
-      'NO_RIGHT_TURN_SIGN': 15,
-      'PEDESTRIAN_CROSSING_SIGN': 16,
-      'STOP_SIGN': 17,
-      'RED_YIELD_SIGN': 18,
-      'SLOW_SIGN': 19,
-      'SOLID_GREEN_LIGHT': 20,
+      'SOLID_RED_LIGHT': 7,
+      'RED_LEFT_ARROW_LIGHT': 8,
+      'NO_LEFT_TURN_SIGN': 9,
+      'NO_RIGHT_TURN_SIGN': 10,
+      'SLOW_SIGN': 11,
       
-      'STOP_LINE': 21,
-      'DOUBLE_DASHED_WHITE_LINE_LEFT': 22,
-      'DOUBLE_DASHED_WHITE_LINE_RIGHT': 23,
-      'SINGLE_SOLID_WHITE_LINE_LEFT': 24,
-      'SINGLE_SOLID_WHITE_LINE_RIGHT': 25,
-      'DOUBLE_SOLID_WHITE_LINE_LEFT': 26,
-      'DOUBLE_SOLID_WHITE_LINE_RIGHT': 27,
-      'SINGLE_ZIGZAG_WHITE_LINE_LEFT': 28,
-      'SINGLE_ZIGZAG_WHITE_LINE_RIGHT': 29,
-      'SINGLE_SOLID_YELLOW_LINE_LEFT': 30,
-      'SINGLE_SOLID_YELLOW_LINE_RIGHT': 31,
+      'DOUBLE_DASHED_WHITE_LINE_LEFT': 12,
+      'DOUBLE_DASHED_WHITE_LINE_RIGHT': 13,
+      'SINGLE_SOLID_WHITE_LINE_LEFT': 14,
+      'SINGLE_SOLID_WHITE_LINE_RIGHT': 15,
+      'DOUBLE_SOLID_WHITE_LINE_LEFT': 16,
+      'DOUBLE_SOLID_WHITE_LINE_RIGHT': 17,
+      'SINGLE_ZIGZAG_WHITE_LINE_LEFT': 18,
+      'SINGLE_ZIGZAG_WHITE_LINE_RIGHT': 19,
+      'SINGLE_SOLID_YELLOW_LINE_LEFT': 20,
+      'SINGLE_SOLID_YELLOW_LINE_RIGHT': 21,
+      
+      'NORMAL_CS': 22,
+      'FAST_CS': 23,
+      'SLOW_CS': 24,
+      'STOP_CS': 25,
+      'LEFT_CS': 26,
+      'RIGHT_CS': 27,
+      'STRAIGHT_CS': 28,
     }
     
     self.velocity_action_num = 4
-    self.direction_action_num = 5
-    self.action_num = 9
-    self.condition_num = 23
+    self.direction_action_num = 3
+    self.action_num = 7
+    self.condition_num = 22
       
     self.formulas = [      
-      lambda args: args[self.predicate["KEEP"]], # KEEP
-      lambda args: args[self.predicate["ACCELERATE"]], # ACCELERATE
-      lambda args: args[self.predicate["DECELERATE"]], # DECELERATE
-      lambda args: args[self.predicate["STOP"]], # STOP
-      lambda args: args[self.predicate["MAKE_LEFT_TURN"]], # MAKE_LEFT_TURN
-      lambda args: args[self.predicate["MAKE_RIGHT_TURN"]], # MAKE_RIGHT_TURN
-      lambda args: args[self.predicate["CHANGE_TO_LEFT_LANE"]], # CHANGE_TO_LEFT_LANE
-      lambda args: args[self.predicate["CHANGE_TO_RIGHT_LANE"]], # CHANGE_TO_RIGHT_LANE
-      lambda args: args[self.predicate["STRAIGHT"]], # STRAIGHT
+      lambda args: args[self.predicate["NORMAL"]], 
+      lambda args: args[self.predicate["FAST"]], 
+      lambda args: args[self.predicate["SLOW"]], 
+      lambda args: args[self.predicate["STOP"]], 
+      lambda args: args[self.predicate["LEFT"]], 
+      lambda args: args[self.predicate["RIGHT"]], 
+      lambda args: args[self.predicate["STRAIGHT"]],
       
-      lambda args: 1 - args[self.predicate["SOLID_RED_LIGHT"]] + args[self.predicate["SOLID_RED_LIGHT"]] * \
-                      (1 - args[self.predicate["ACCELERATE"]]), # SolidRedLight → ¬Accelerate
-      
-      lambda args: 1 - args[self.predicate["SOLID_YELLOW_LIGHT"]] + args[self.predicate["SOLID_YELLOW_LIGHT"]] * \
-                      ((args[self.predicate["MAKE_LEFT_TURN"]] + \
-                        args[self.predicate["MAKE_RIGHT_TURN"]] + \
-                        args[self.predicate["KEEP"]] + \
-                        args[self.predicate["STOP"]] + \
-                        args[self.predicate["DECELERATE"]] - \
-                        args[self.predicate["MAKE_LEFT_TURN"]] * args[self.predicate["MAKE_RIGHT_TURN"]] - \
-                        args[self.predicate["MAKE_LEFT_TURN"]] * args[self.predicate["KEEP"]] - \
-                        args[self.predicate["MAKE_LEFT_TURN"]] * args[self.predicate["STOP"]] - \
-                        args[self.predicate["MAKE_LEFT_TURN"]] * args[self.predicate["DECELERATE"]] - \
-                        args[self.predicate["MAKE_RIGHT_TURN"]] * args[self.predicate["KEEP"]] - \
-                        args[self.predicate["MAKE_RIGHT_TURN"]] * args[self.predicate["STOP"]] - \
-                        args[self.predicate["MAKE_RIGHT_TURN"]] * args[self.predicate["DECELERATE"]] - \
-                        args[self.predicate["KEEP"]] * args[self.predicate["STOP"]] - \
-                        args[self.predicate["KEEP"]] * args[self.predicate["DECELERATE"]] - \
-                        args[self.predicate["STOP"]] * args[self.predicate["DECELERATE"]] + \
-                        args[self.predicate["MAKE_LEFT_TURN"]] * args[self.predicate["MAKE_RIGHT_TURN"]] * \
-                        args[self.predicate["KEEP"]] * args[self.predicate["STOP"]] * \
-                        args[self.predicate["DECELERATE"]]) * \
-                        (1 - args[self.predicate["ACCELERATE"]])), #SolidYellowLight → MakeLeftTurn ∨ MakeRightTurn∨ Keep ∨ Stop ∨ Decelerate ∧ ¬Accelerate
-
-      lambda args: 1 - args[self.predicate["YELLOW_LEFT_ARROW_LIGHT"]] + args[self.predicate["YELLOW_LEFT_ARROW_LIGHT"]] * \
-                      (args[self.predicate["STOP"]] + args[self.predicate["DECELERATE"]] - \
-                      args[self.predicate["STOP"]] * args[self.predicate["DECELERATE"]]),  # YellowLeftArrowLight → Stop ∨ Decelerate
+      lambda args: 1 - args[self.predicate["SOLID_RED_LIGHT"]] + args[self.predicate["FAST"]] * \
+                      (1 - args[self.predicate["FAST"]]), # SolidRedLight → ¬Fast
 
       lambda args: 1 - args[self.predicate["RED_LEFT_ARROW_LIGHT"]] + args[self.predicate["RED_LEFT_ARROW_LIGHT"]] * \
-                      (1 - args[self.predicate["MAKE_LEFT_TURN"]]),  # RedLeftArrowLight → ¬MakeLeftTurn
-
-      lambda args: 1 - args[self.predicate["MERGING_TRAFFIC_SIGN"]] + args[self.predicate["MERGING_TRAFFIC_SIGN"]] * \
-                      (args[self.predicate["DECELERATE"]] + args[self.predicate["STOP"]] + args[self.predicate["KEEP"]]),  # MergingTrafficSign → Decelerate ∨ Stop ∨ Keep
+                      (1 - args[self.predicate["LEFT"]]),  # RedLeftArrowLight → ¬Left
 
       lambda args: 1 - args[self.predicate["NO_LEFT_TURN_SIGN"]] + args[self.predicate["NO_LEFT_TURN_SIGN"]] * \
-                      (1 - args[self.predicate["MAKE_LEFT_TURN"]]),  # NoLeftTurnSign → ¬MakeLeftTurn
+                      (1 - args[self.predicate["LEFT"]]),  # NoLeftTurnSign → ¬Left
 
       lambda args: 1 - args[self.predicate["NO_RIGHT_TURN_SIGN"]] + args[self.predicate["NO_RIGHT_TURN_SIGN"]] * \
-                      (1 - args[self.predicate["MAKE_RIGHT_TURN"]]),  # NoRightTurnSign → ¬MakeRightTurn
-
-      lambda args: 1 - args[self.predicate["RED_YIELD_SIGN"]] + args[self.predicate["RED_YIELD_SIGN"]] * \
-                      (args[self.predicate["DECELERATE"]] + args[self.predicate["STOP"]] + args[self.predicate["KEEP"]]),  # RedYieldSign → Decelerate ∨ Stop ∨ Keep
+                      (1 - args[self.predicate["RIGHT"]]),  # NoRightTurnSign → ¬Right
 
       lambda args: 1 - args[self.predicate["SLOW_SIGN"]] + args[self.predicate["SLOW_SIGN"]] * \
-                      (1 - args[self.predicate["ACCELERATE"]]),  # SlowSign → ¬Accelerate
-      
-      # lambda args: 1 - args[self.predicate["STOP_LINE"]] + args[self.predicate["STOP_LINE"]] * \
-      #                 (1 - args[self.predicate["ACCELERATE"]]),  # STOP_LINE → ¬Accelerate         
+                      (1 - args[self.predicate["FAST"]]),  # SlowSign → ¬Fast  
       
       lambda args: 1 - args[self.predicate["SINGLE_SOLID_WHITE_LINE_LEFT"]] + args[self.predicate["SINGLE_SOLID_WHITE_LINE_LEFT"]] * \
-                      (1 - args[self.predicate["CHANGE_TO_LEFT_LANE"]]),  # SingleSolidWhiteLineLeft → ¬ChangeToLeftLane
+                      (1 - args[self.predicate["LEFT"]]),  # SingleSolidWhiteLineLeft → ¬Left
                       
       lambda args: 1 - args[self.predicate["SINGLE_SOLID_WHITE_LINE_RIGHT"]] + args[self.predicate["SINGLE_SOLID_WHITE_LINE_RIGHT"]] * \
-                      (1 - args[self.predicate["CHANGE_TO_RIGHT_LANE"]]),  # SingleSolidWhiteLineRight → ¬ChangeToRightLane
+                      (1 - args[self.predicate["RIGHT"]]),  # SingleSolidWhiteLineRight → ¬Right
                       
       lambda args: 1 - args[self.predicate["DOUBLE_SOLID_WHITE_LINE_LEFT"]] + args[self.predicate["DOUBLE_SOLID_WHITE_LINE_LEFT"]] * \
-                      (1 - args[self.predicate["CHANGE_TO_LEFT_LANE"]]),  # DOUBLE_SOLID_WHITE_LINE_LEFT → ¬ChangeToLeftLane
+                      (1 - args[self.predicate["LEFT"]]),  # DOUBLE_SOLID_WHITE_LINE_LEFT → ¬Left
                       
       lambda args: 1 - args[self.predicate["DOUBLE_SOLID_WHITE_LINE_RIGHT"]] + args[self.predicate["DOUBLE_SOLID_WHITE_LINE_RIGHT"]] * \
-                      (1 - args[self.predicate["CHANGE_TO_RIGHT_LANE"]]),  # DOUBLE_SOLID_WHITE_LINE_RIGHT → ¬ChangeToRightLane
+                      (1 - args[self.predicate["RIGHT"]]),  # DOUBLE_SOLID_WHITE_LINE_RIGHT → ¬Right
 
       lambda args: 1 - args[self.predicate["SINGLE_ZIGZAG_WHITE_LINE_LEFT"]] + args[self.predicate["SINGLE_ZIGZAG_WHITE_LINE_LEFT"]] * \
                       (1 - args[self.predicate["STOP"]]),  # SingleZigzagWhiteLineLeft → ¬Stop
 
       lambda args: 1 - args[self.predicate["SINGLE_ZIGZAG_WHITE_LINE_RIGHT"]] + args[self.predicate["SINGLE_ZIGZAG_WHITE_LINE_RIGHT"]] * \
                       (1 - args[self.predicate["STOP"]]),  # SingleZigzagWhiteLineRight → ¬Stop 
-    ]
+                      
+      lambda args: 1 - args[self.predicate["NORMAL_CS"]] + args[self.predicate["NORMAL_CS"]] * \
+                      args[self.predicate["NORMAL"]],  # NORMAL_CS → NORMAL
+                      
+      lambda args: 1 - args[self.predicate["FAST_CS"]] + args[self.predicate["FAST_CS"]] * \
+                      args[self.predicate["FAST"]],  # FAST_CS → FAST
+                      
+      lambda args: 1 - args[self.predicate["SLOW_CS"]] + args[self.predicate["SLOW_CS"]] * \
+                      args[self.predicate["SLOW"]],  # SLOW_CS → SLOW
+                      
+      lambda args: 1 - args[self.predicate["STOP_CS"]] + args[self.predicate["STOP_CS"]] * \
+                      args[self.predicate["STOP"]],  # STOP_CS → STOP 
+                      
+      lambda args: 1 - args[self.predicate["LEFT_CS"]] + args[self.predicate["LEFT_CS"]] * \
+                      args[self.predicate["LEFT"]],  # LEFT_CS → LEFT
+                      
+      lambda args: 1 - args[self.predicate["RIGHT_CS"]] + args[self.predicate["RIGHT_CS"]] * \
+                      args[self.predicate["RIGHT"]],  # RIGHT_CS → RIGHT
+                      
+      lambda args: 1 - args[self.predicate["STRAIGHT_CS"]] + args[self.predicate["STRAIGHT_CS"]] * \
+                      args[self.predicate["STRAIGHT"]],  # STRAIGHT_CS → STRAIGHT
+    ] 
+                      
+      
       
   
 

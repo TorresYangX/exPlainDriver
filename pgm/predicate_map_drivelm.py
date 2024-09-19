@@ -2,52 +2,35 @@ import json
 import pickle
 from tqdm import tqdm
 
-predicate_num = 32
+predicate_num = 29
 
 action_map = {
-    "Keep": 0,
-    "Accelerate": 1,
-    "Decelerate": 2,
+    "Noraml": 0,
+    "Fast": 1,
+    "Slow": 2,
     "Stop": 3,
-    "MakeLeftTurn": 4,
-    "MakeRightTurn": 5,
-    "ChangeToLeftLane": 6,
-    "ChangeToRightLane": 7,
-    "Straight": 8,
+    "Left": 4,
+    "Right": 5,
+    "Straight": 6,
 }
 
 class_map = {
-    "stop traffic light": 9, 
-    "warning": 10, 
-    "warning traffic light": 10, 
-    "warning left": 11, 
-    "warning left traffic light": 11, 
-    "stop left": 12, 
-    "stop left traffic light": 12, 
-    "merge": 13,
-    "noLeftTurn": 14,
-    "noRightTurn": 15,
-    "pedestrianCrossing": 16,
-    "stop": 17,
-    "stopAhead": 17,
-    "yield": 18,
-    "yieldAhead": 18,
-    "slow": 19,
-    "go": 20,
-    "go forward": 20,
-    "go forward traffic light": 20,
-    
-    'stopLine': 21,
-    'DOUBLE_DASHED_WHITE_LEFT': 22,
-    'DOUBLE_DASHED_WHITE_RIGHT': 23,
-    'SINGLE_SOLID_WHITE_LEFT': 24,
-    'SINGLE_SOLID_WHITE_RIGHT': 25,
-    'DOUBLE_SOLID_WHITE_LEFT': 26,
-    'DOUBLE_SOLID_WHITE_RIGHT': 27,
-    'SINGLE_ZIGZAG_WHITE_LEFT': 28,
-    'SINGLE_ZIGZAG_WHITE_RIGHT': 29,
-    'SINGLE_SOLID_YELLOW_LEFT': 30,
-    'SINGLE_SOLID_YELLOW_RIGHT': 31,
+    "stop traffic light": 7, 
+    "stop left": 8, 
+    "stop left traffic light": 8, 
+    "noLeftTurn": 9,
+    "noRightTurn": 10,
+    "slow": 11,
+    'DOUBLE_DASHED_WHITE_LEFT': 12,
+    'DOUBLE_DASHED_WHITE_RIGHT': 13,
+    'SINGLE_SOLID_WHITE_LEFT': 14,
+    'SINGLE_SOLID_WHITE_RIGHT': 15,
+    'DOUBLE_SOLID_WHITE_LEFT': 16,
+    'DOUBLE_SOLID_WHITE_RIGHT': 17,
+    'SINGLE_ZIGZAG_WHITE_LEFT': 18,
+    'SINGLE_ZIGZAG_WHITE_RIGHT': 19,
+    'SINGLE_SOLID_YELLOW_LEFT': 20,
+    'SINGLE_SOLID_YELLOW_RIGHT': 21,
     
     
     "intersection": None,
@@ -90,11 +73,19 @@ class_map = {
     "zoneAhead45": None
 }
 
+cs_map = {
+    'Normal': 22,
+    'Fast': 23,
+    'Slow': 24,
+    'Stop': 25,
+    'Left': 26,
+    'Right': 27,
+    'Straight': 28,
+}
+
 
 def map_action_to_vector(action_list):
-    
     vector = [0] * predicate_num
-    
     # if action is not None
     if action_list:
         for action in action_list:
@@ -113,16 +104,23 @@ def map_classes_to_vector(classes):
                     vector[index] = 1
     return vector
 
-def combine_vectors(action_vector, class_vector):
-    combined_vector = [max(a, c) for a, c in zip(action_vector, class_vector)]
+def map_cs_to_vector(velocity, direction):
+    vector = [0] * predicate_num
+    if velocity and direction:
+        vector[cs_map[direction]] = 1
+        vector[cs_map[velocity]] = 1
+    return vector
+
+def combine_vectors(action_vector, class_vector, cs_vector):
+    combined_vector = [max(a, c, cs) for a, c, cs in zip(action_vector, class_vector, cs_vector)]
     return combined_vector
 
 
 def segment_to_vector(segment):
     action_vector = map_action_to_vector(segment["action"])
     class_vector = map_classes_to_vector(segment["classes"])
-    return combine_vectors(action_vector, class_vector)
-
+    cs_vector = map_cs_to_vector(segment["velocity_predicate"], segment["direction_predicate"])
+    return combine_vectors(action_vector, class_vector, cs_vector)
 
 def json_to_vectors(YOLO_detect_path, train_data_savePth):
     data = json.load(open(YOLO_detect_path))
@@ -134,17 +132,3 @@ def json_to_vectors(YOLO_detect_path, train_data_savePth):
     with open(train_data_savePth, "wb") as f:
         pickle.dump(vectors, f)  
     return
-
-if __name__ == "__main__":
-    YOLO_detect_path = "process_data_drivelm/test/test_detected_classes.json"
-    train_data_savePth = "process_data_drivelm/test/test_vectors.pkl"
-    json_to_vectors(YOLO_detect_path, train_data_savePth)
-    
-    # condition_vector_path = "process_data_drivelm/test/test_condition_vectors.pkl"
-    # train_vectors = pickle.load(open(train_data_savePth, "rb"))
-    # print(len(train_vectors), len(train_vectors[0]))
-    # condition_vectors = [row[8:] for row in train_vectors]
-    # print(len(condition_vectors), len(condition_vectors[0]))
-    # with open(condition_vector_path, "wb") as f:
-    #     pickle.dump(condition_vectors, f)
-    

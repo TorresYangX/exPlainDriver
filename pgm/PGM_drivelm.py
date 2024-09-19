@@ -85,9 +85,7 @@ class PGM:
             direction_predictions_prob = []
             for instance in data:
                 condition_input = instance[self.action_num:]
-                probs, _, _ = self.infer_action_probability(condition_input)
-                velocity_probs = probs[:self.velocity_action_num]
-                direction_probs = probs[self.velocity_action_num:]
+                velocity_probs, direction_probs, _, _ = self.infer_action_probability(condition_input)
                 velocity_predictions_prob.append(velocity_probs[velocity_true_labels[len(velocity_predictions_prob)]])
                 direction_predictions_prob.append(direction_probs[direction_true_labels[len(direction_predictions_prob)]])
             velocity_avg_prob = np.mean(velocity_predictions_prob)
@@ -128,7 +126,6 @@ class PGM:
         return accuracy
 
     
-    
     def infer_action_probability(self, condition_input):
         """
         instance: np.array([...]): conditions
@@ -141,7 +138,7 @@ class PGM:
         probs = np.concatenate((velo_probs, dire_probs))
         velocity_action_index = np.argmax(probs[:self.velocity_action_num])
         direction_action_index = np.argmax(probs[self.velocity_action_num:]) + self.velocity_action_num
-        return probs, velocity_action_index, direction_action_index
+        return velo_probs, dire_probs, velocity_action_index, direction_action_index
     
     
     def validate_instance(self, instance):
@@ -161,6 +158,6 @@ class PGM:
         instance: np.array([...]): Input data with action and condition combinations
         """
         condition_input = instance[self.action_num:]
-        probs, _, _ = self.infer_action_probability(condition_input)
-        return probs[instance[:self.velocity_action_num].argmax()], probs[self.velocity_action_num+instance[self.velocity_action_num: self.action_num].argmax()]
+        velo_probs, dire_probs, _, _ = self.infer_action_probability(condition_input)
+        return velo_probs[instance[:self.velocity_action_num].argmax()], dire_probs[instance[self.velocity_action_num: self.action_num].argmax()]
         
