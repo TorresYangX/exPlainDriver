@@ -8,15 +8,15 @@ import os
 def action_map(sentence):
     mapping_rules = {
         r'going straight': 'Straight',
-        r'driving fast': 'Accelerate',
-        r'driving very fast': 'Accelerate',
-        r'driving slowly': 'Decelerate',
-        r'driving with normal speed': 'Keep',
+        r'driving fast': 'Fast',
+        r'driving very fast': 'Fast',
+        r'driving slowly': 'Slow',
+        r'driving with normal speed': 'Normal',
         r'not moving': 'Stop',
-        r'slightly steering to the left': 'ChangeToLeftLane',
-        r'slightly steering to the right': 'ChangeToRightLane',
-        r'steering to the right': 'MakeRightTurn',
-        r'steering to the left': 'MakeLeftTurn',
+        r'slightly steering to the left': 'Straight',
+        r'slightly steering to the right': 'Straight',
+        r'steering to the right': 'Left',
+        r'steering to the left': 'Right',
     }
     actions = []
     matched_patterns = set()

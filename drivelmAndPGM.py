@@ -1,9 +1,11 @@
 import re 
 import json
+import random
 import numpy as np
 from pgm.config import DriveLM
 from pgm.PGM_drivelm import PGM
 from pgm.predicate_map_drivelm import segment_to_vector
+from utils_drivelm import action_map
 
 def map_detect_item(id, detect_data):
     for item in detect_data:
@@ -19,9 +21,7 @@ def map_index_to_description(index):
         '3': ['not moving'],
         '4': ['steering to the left'],
         '5': ['steering to the right'],
-        '6': ['slightly steering to the left'],
-        '7': ['slightly steering to the right'],
-        '8': ['going straight']
+        '6': ['going straight', 'slightly steering to the left', 'slightly steering to the right'],
     }
     return index2action[str(index)]
 
@@ -31,56 +31,44 @@ def question2option(question):
     options_list = [(match[0], match[1].strip()) for match in matches]
     return options_list
 
+def option2description(option_list, option):
+    for item in option_list:
+        if item[0] == option:
+            return item[1]
+
 def action2description(action_list):
     velo_predicate = None
     dire_predicate = None
     for action in action_list:
-        if action in ['Keep', 'Accelerate', 'Decelerate', 'Stop']:
+        if action in ['Normal', 'Fast', 'Slow', 'Stop']:
             velo_predicate = action
         else:
             dire_predicate = action
-
     action2description = {
-        'Keep': ['driving with normal speed'],
-        'Accelerate': ['driving very fast', 'driving fast'],
-        'Decelerate': ['driving slowly'],
+        'Normal': ['driving with normal speed'],
+        'Fast': ['driving very fast', 'driving fast'],
+        'Slow': ['driving slowly'],
         'Stop': ['not moving'],
-        'MakeLeftTurn': ['steering to the left'],
-        'MakeRightTurn': ['steering to the right'],
-        'ChangeToLeftLane': ['slightly steering to the left'],
-        'ChangeToRightLane': ['slightly steering to the right'],
-        'Straight': ['going straight']
+        'Left': ['steering to the left'],
+        'Right': ['steering to the right'],
+        'Straight': ['going straight', 'slightly steering to the left', 'slightly steering to the right']
     }
     return {'velo_desc': action2description[velo_predicate], 'dire_desc': action2description[dire_predicate]}
 
+def desc_filter_option(desc, option_list):
+    probable_option = []
+    for opt in option_list:
+        for sub_desc in desc:
+            if sub_desc in opt[1]:
+                probable_option.append(opt)
+                break
+    return probable_option
 
-def test_pgm():
-    with open('process_data_drivelm/train/train_detected_classes.json') as f:
-        detect_data = json.load(f)
-        
-    weight = np.load('optimal_weights_drivelm.npy')
-    pgm = PGM(weights = weight, config=DriveLM())
-    wrong_items = []
-    for item in detect_data:
-        action_list = item['action']
-        condition_predicate = item['classes']
-        segment = {
-            'action': action_list,
-            'classes': condition_predicate
-        }
-        vector = np.array(segment_to_vector(segment))
-        velo_prob, dire_prob = pgm.compute_instance_probability(vector)
-        if velo_prob < 1e-3 or dire_prob < 1e-3:
-            wrong_item = {
-                'image_id': item['image_id'],
-                'velo_prob': velo_prob,
-                'dire_prob': dire_prob,
-                'action': action_list,
-                'classes': condition_predicate
-            }
-            wrong_items.append(wrong_item)
-        with open('drivelm_wrong_items.json', 'w') as f:
-            json.dump(wrong_items, f, indent=4)
+def id2predAns(id, pred_data):
+    for item in pred_data:
+        if id == item[0]['image_id']:
+            return item[-2]['caption']
+    return None
 
 
 def main():
@@ -96,72 +84,144 @@ def main():
     # pred_origin_file
     with open('DriveLM_process/DrivingLM_Test_pred.json') as f:
         origin_data = json.load(f)
-    
+    # ground_answer_file
+    with open('DriveLM_process/drivelm_val_clean.json') as f:
+        answer_data = json.load(f)    
+
     weight = np.load('optimal_weights_drivelm.npy')
     pgm = PGM(weights = weight, config=DriveLM())
     
+    undetect_items = []
+    misdetect_items = []
+    corrdetect_items = []
+    
     for item in pred_data:
         image_id = item['image_id']
-        action_list = item['action_list']
+        scene_id = image_id.split('_')[0]
+        keyframe_id = image_id.split('_')[1]
+        
+        question = question_data[scene_id]["key_frames"][keyframe_id]["QA"]["behavior"][0]["Q"]
+        option_list = question2option(question)
+        ground_ans = answer_data[scene_id]["key_frames"][keyframe_id]["QA"]["behavior"][0]["A"]
+        ground_action_list = action_map(option2description(option_list, ground_ans))
+        pred_ans = id2predAns(image_id, origin_data)
+        
+        action_list = item['action']
         detect_item = map_detect_item(image_id, detect_data)
         condition_predicate = detect_item['classes']
+        velo_predicate = detect_item['velocity_predicate']
+        dire_predicate = detect_item['direction_predicate']
         segment = {
             'action': action_list,
-            'classes': condition_predicate
+            'classes': condition_predicate,
+            'velocity_predicate': velo_predicate,
+            'direction_predicate': dire_predicate
         }
         vector = np.array(segment_to_vector(segment))
         condition_vector = vector[DriveLM().action_num:]
         velo_prob, dire_prob = pgm.compute_instance_probability(vector)
-        # for dire_predicate in ['SINGLE_SOLID_WHITE_LEFT','SINGLE_SOLID_WHITE_RIGHT']:
-        #     if dire_predicate in condition_predicate and 'Straight' not in action_list:
-        #         print('action_list:', action_list, 'condition_predicate:', condition_predicate)
-        #         print('velo_prob:', velo_prob, 'dire_prob:', dire_prob)
-        #         print(vector)
-        new_velo_descs = None
-        new_dire_descs = None
+        velo_probs = None
+        dire_probs = None
+        modify_ans = None
         if velo_prob < 1e-2:
-           _, velo_index, _ = pgm.infer_action_probability(condition_vector)
-           new_velo_descs = map_index_to_description(velo_index)
+           velo_probs, _, _, _ = pgm.infer_action_probability(condition_vector)
         if dire_prob < 1e-2:
-           _, _, dire_index = pgm.infer_action_probability(condition_vector)
-           new_dire_descs = map_index_to_description(dire_index)
-        if new_velo_descs or new_dire_descs:
-            scene_id = image_id.split('_')[0]
-            keyframe_id = image_id.split('_')[1]
-            question = question_data[scene_id]["key_frames"][keyframe_id]["QA"]["behavior"][0]["Q"]
-            option_list = question2option(question)
-            if new_velo_descs and not new_dire_descs:
-                final_velo_descs = new_velo_descs
-                final_dire_descs = action2description(action_list)['dire_desc']
-            elif new_dire_descs and not new_velo_descs:
-                final_dire_descs = new_dire_descs
-                final_velo_descs = action2description(action_list)['velo_desc']
+           _, dire_probs, _, _ = pgm.infer_action_probability(condition_vector)
+        if velo_probs is not None or dire_probs is not None:
+            if velo_probs is None and dire_probs is not None:
+                velo_desc = action2description(action_list)['velo_desc']
+                probable_option = desc_filter_option(velo_desc, option_list)
+                dire_probs = np.array(dire_probs)
+                dire_probs_index = dire_probs.argsort()[::-1] + DriveLM().velocity_action_num
+                for index in dire_probs_index:
+                    dire_desc = map_index_to_description(index)
+                    final_option = desc_filter_option(dire_desc, probable_option)
+                    if len(final_option) > 0:
+                        break
+            elif dire_probs is None and velo_probs is not None:
+                dire_desc = action2description(action_list)['dire_desc']
+                probable_option = desc_filter_option(dire_desc, option_list)
+                velo_probs = np.array(velo_probs)
+                velo_probs_index = velo_probs.argsort()[::-1]
+                for index in velo_probs_index:
+                    velo_desc = map_index_to_description(index)
+                    final_option = desc_filter_option(velo_desc, probable_option)
+                    if len(final_option) > 0:
+                        break
             else:
-                final_velo_descs = new_velo_descs
-                final_dire_descs = new_dire_descs
-            modify_option = []
-            possible_options = []
-            for option_item in option_list:
-                for desc in final_velo_descs:
-                    if desc in option_item[1]:
-                        possible_options.append(option_item)
-            for possible_option in possible_options:
-                for desc in final_dire_descs:
-                    if desc in possible_option[1]:
-                        modify_option.append(possible_option[0])
-            if len(modify_option) != 1:
-                print('error detect:', image_id)
-                print('error')
-                print('classes:', condition_predicate , 'final_velo_descs:', final_velo_descs, 'final_dire_descs:', final_dire_descs, 'option_list:', option_list, 'modify_option:', modify_option, 'possible_options:', possible_options)
+                velo_probs = np.array(velo_probs)
+                dire_probs = np.array(dire_probs)
+                velo_probs_index = velo_probs.argsort()[::-1]
+                dire_probs_index = dire_probs.argsort()[::-1] + DriveLM().velocity_action_num
+                for index in velo_probs_index:
+                    velo_desc = map_index_to_description(index)
+                    probable_option = desc_filter_option(velo_desc, option_list)
+                    for index in dire_probs_index:
+                        dire_desc = map_index_to_description(index)
+                        final_option = desc_filter_option(dire_desc, probable_option)
+                        if len(final_option) > 0:
+                            break
+                    if len(final_option) > 0:
+                        break
+            final_option_option = [item[0] for item in final_option]
+            if pred_ans in final_option_option:
+                modify_ans = pred_ans
             else:
-                print('error detect:', image_id)
-                print('modify_option:', modify_option)            
-            
-
+                modify_ans = random.choice(final_option_option)
+            modify_action_list = action_map(option2description(option_list, modify_ans))
+            if modify_ans == ground_ans and pred_ans != ground_ans:
+                record_item = {
+                    'image_id': image_id,
+                    'ground_ans': ground_ans,
+                    'pred_ans': pred_ans,
+                    'modify_ans': modify_ans,
+                    'classes': condition_predicate,
+                    'velocity_predicate': velo_predicate,
+                    'direction_predicate': dire_predicate,
+                    'pred_action': action_list,
+                    'ground_action': ground_action_list,
+                    'modify_action': modify_action_list
+                }
+                corrdetect_items.append(record_item)
+            elif pred_ans == ground_ans and modify_ans != ground_ans:
+                record_item = {
+                    'image_id': image_id,
+                    'ground_ans': ground_ans,
+                    'pred_ans': pred_ans,
+                    'modify_ans': modify_ans,
+                    'classes': condition_predicate,
+                    'velocity_predicate': velo_predicate,
+                    'direction_predicate': dire_predicate,
+                    'pred_action': action_list,
+                    'ground_action': ground_action_list,
+                    'modify_action': modify_action_list
+                }
+                misdetect_items.append(record_item)
+        if modify_ans is None and pred_ans != ground_ans:
+            record_item = {
+                'image_id': image_id,
+                'ground_ans': ground_ans,
+                'pred_ans': pred_ans,
+                'classes': condition_predicate,
+                'velocity_predicate': velo_predicate,
+                'direction_predicate': dire_predicate,
+                'pred_action': action_list,
+                'ground_action': ground_action_list,
+                'modify_action': modify_action_list
+            }
+            undetect_items.append(record_item)
+    
+    # save the result
+    with open('result/drivelm/undetect_items.json', 'w') as f:
+        json.dump(undetect_items, f)
+    with open('result/drivelm/misdetect_items.json', 'w') as f:
+        json.dump(misdetect_items, f)
+    with open('result/drivelm/corrdetect_items.json', 'w') as f:
+        json.dump(corrdetect_items, f)
+                                
            
 if __name__ == '__main__':
     main()
-    # test_pgm()
         
             
         

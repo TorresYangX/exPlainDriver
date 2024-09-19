@@ -10,7 +10,7 @@ from tqdm import tqdm
 # from pgm.PGM import PGM
 from pgm.PGM_drivelm import PGM
 from openai import OpenAI
-from pgm.predicate_map import json_to_vectors
+from pgm.predicate_map_drivelm import json_to_vectors
 from pgm.video_annotation import query_annotation_csv
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -245,9 +245,9 @@ def map_LLM_pred(LLM_result_path, save_path):
 def data_prepare(annotation_path, Video_folder, map_save_path, YOLO_detect_path, vector_data_path, segment_num):
     from pgm.YOLO_detector import YOLO_detector
     # query_annotation_csv(annotation_path, segment_num, map_save_path)
-    train_dict = json.load(open(map_save_path))
-    yolo_dec = YOLO_detector(train_dict, Video_folder)
-    yolo_dec.extract_classes(YOLO_detect_path)
+    # train_dict = json.load(open(map_save_path))
+    # yolo_dec = YOLO_detector(train_dict, Video_folder)
+    # yolo_dec.extract_classes(YOLO_detect_path)
     json_to_vectors(YOLO_detect_path, vector_data_path)
     return
 
