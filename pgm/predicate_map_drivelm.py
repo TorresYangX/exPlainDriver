@@ -2,7 +2,7 @@ import json
 import pickle
 from tqdm import tqdm
 
-predicate_num = 29
+predicate_num = 36
 
 action_map = {
     "Noraml": 0,
@@ -83,6 +83,16 @@ cs_map = {
     'Straight': 28,
 }
 
+LLM_action_map = {
+    'Normal': 29,
+    'Fast': 30,
+    'Slow': 31,
+    'Stop': 32,
+    'Left': 33,
+    'Right': 34,
+    'Straight': 35,
+}
+
 
 def map_action_to_vector(action_list):
     vector = [0] * predicate_num
@@ -111,22 +121,42 @@ def map_cs_to_vector(velocity, direction):
         vector[cs_map[velocity]] = 1
     return vector
 
-def combine_vectors(action_vector, class_vector, cs_vector):
-    combined_vector = [max(a, c, cs) for a, c, cs in zip(action_vector, class_vector, cs_vector)]
+def map_llm_to_vector(action_list):
+    vector = [0] * predicate_num
+    if action_list:
+        for action in action_list:
+            if action in LLM_action_map:
+                index = LLM_action_map[action]
+                vector[index] = 1
+    return vector
+    
+
+def combine_vectors(action_vector, class_vector, cs_vector, llm_vector):
+    combined_vector = [max(a, c, cs, llm) for a, c, cs, llm in zip(action_vector, class_vector, cs_vector, llm_vector)]
     return combined_vector
 
 
-def segment_to_vector(segment):
+def segment_to_vector(segment, llm_prediction):
     action_vector = map_action_to_vector(segment["action"])
     class_vector = map_classes_to_vector(segment["classes"])
     cs_vector = map_cs_to_vector(segment["velocity_predicate"], segment["direction_predicate"])
-    return combine_vectors(action_vector, class_vector, cs_vector)
+    llm_vector = map_llm_to_vector(llm_prediction)
+    return combine_vectors(action_vector, class_vector, cs_vector, llm_vector)
 
-def json_to_vectors(YOLO_detect_path, train_data_savePth):
+def id2prediction(id, prediction_data):
+    for item in prediction_data:
+        if item["image_id"] == id:
+            return item["action"]
+
+def json_to_vectors(YOLO_detect_path, train_data_savePth, llm_prediction_path):
+    print('begin to convert json to vectors...')
     data = json.load(open(YOLO_detect_path))
     vectors = []
+    prediction_data = json.load(open(llm_prediction_path))
     for item in tqdm(data):
-        vector = segment_to_vector(item)
+        id = item["image_id"]
+        llm_prediction = id2prediction(id, prediction_data)
+        vector = segment_to_vector(item, llm_prediction)
         vectors.append(vector)
     print(len(vectors), len(vectors[0]))
     with open(train_data_savePth, "wb") as f:

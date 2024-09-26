@@ -2,7 +2,7 @@ import json
 import pickle
 from tqdm import tqdm
 
-predicate_num = 36
+predicate_num = 52
 
 action_map = {
     "Keep": 0,
@@ -94,6 +94,25 @@ cs_map = {
     "Left": 34,
     "Right": 35,
 }
+
+LLM_action_map = {
+    "Keep": 36,
+    "Accelerate": 37,
+    "Decelerate": 38,
+    "Stop": 39,
+    "Reverse": 40,
+    "MakeLeftTurn": 41,
+    "MakeRightTurn": 42,
+    "MakeUTurn": 43,
+    "Merge": 44,
+    "LeftPass": 45,
+    "RightPass": 46,
+    "Yield": 47,
+    "ChangeToLeftLane": 48,
+    "ChangeToRightLane": 49,
+    "Park": 50,
+    "PullOver": 51
+}
     
 
 def map_action_to_vector(action_list):
@@ -125,23 +144,43 @@ def map_cs_to_vector(velocity, direction):
         vector[cs_map[velocity]] = 1
     return vector
 
+def map_llm_to_vector(action_list):
+    vector = [0] * predicate_num
+    if action_list:
+        for action in action_list:
+            if action in LLM_action_map:
+                index = LLM_action_map[action]
+                vector[index] = 1
+    return vector
 
-def combine_vectors(action_vector, class_vector, cs_vector):
-    combined_vector = [max(a, c, cs) for a, c, cs in zip(action_vector, class_vector, cs_vector)]
+
+def combine_vectors(action_vector, class_vector, cs_vector, llm_vector):
+    combined_vector = [max(a, c, cs, llm) for a, c, cs, llm in zip(action_vector, class_vector, cs_vector, llm_vector)]
     return combined_vector
 
-def segment_to_vector(segment):
+def segment_to_vector(segment, llm_prediction):
     action_vector = map_action_to_vector(segment["action"])
     class_vector = map_classes_to_vector(segment["classes"])
     cs_vector = map_cs_to_vector(segment["velocity_predicate"], segment["direction_predicate"])
-    return combine_vectors(action_vector, class_vector, cs_vector)
+    llm_vector = map_llm_to_vector(llm_prediction)
+    return combine_vectors(action_vector, class_vector, cs_vector, llm_vector)
 
-def json_to_vectors(YOLO_detect_path, train_data_savePth):
+def id2prediction(id, prediction_path):
+    prediction_data = json.load(open(prediction_path))
+    for item in prediction_data:
+        if item["id"] == id:
+            return item["predicate"]
+
+def json_to_vectors(YOLO_detect_path, train_data_savePth, llm_prediction_path):
+    print('begin to convert json to vectors...')
     data = json.load(open(YOLO_detect_path))
     vectors = []
     for item in tqdm(data):
-        vector = segment_to_vector(item)
+        id = item["id"]
+        llm_prediction = id2prediction(id, llm_prediction_path)
+        vector = segment_to_vector(item, llm_prediction)
         vectors.append(vector)
+    print('vectors shape:', len(vectors), len(vectors[0]))
     with open(train_data_savePth, "wb") as f:
         pickle.dump(vectors, f)  
     return
