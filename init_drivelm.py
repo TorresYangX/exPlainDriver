@@ -1,21 +1,20 @@
 import numpy as np
 from pgm.config import DriveLM
 from pgm.PGM_drivelm import PGM
-from utils import data_prepare, train_pipeline, map_LLM_pred
-from utils_drivelm import pred_action_predicate_extractor
+from utils_drivelm import pred_action_predicate_extractor, data_prepare, train_pipeline
 import json
+import pickle
 
 if __name__ == "__main__":    
     pattern = 'train'
-    map_save_path = 'process_data/{}/map_ann_{}.json'.format(pattern, pattern)
-    YOLO_detect_path = 'process_data_drivelm/{}/{}_detected_classes.json'.format(pattern, pattern)
-    vector_data_path = 'process_data_drivelm/{}/vectors.pkl'.format(pattern)
-    pred_path = 'DriveLM_process/DrivingLM_Test_pred_pdce.json'
-    question_path = 'DriveLM_process/v1_1_val_nus_q_only.json'
+    conversation_path = 'Data/DriveLM/DriveLM_process/conversation_drivelm_{}.json'.format(pattern)
+    question_path = 'Data/DriveLM/DriveLM_process/v1_1_val_nus_q_only.json'
+    YOLO_detect_path = 'Data/DriveLM/process_data_drivelm/{}/{}_detected_classes.json'.format(pattern, pattern)
+    vector_data_path = 'Data/DriveLM/process_data_drivelm/{}/vectors.pkl'.format(pattern)
     llm_prediction_path = 'result/drivelm_pdce/LLM_result.json'
     weight_save_path = 'optimal_weights_drivelm_llm_rule.npy'    
+    data_prepare(conversation_path, question_path, YOLO_detect_path, vector_data_path, llm_prediction_path)
     
-    pred_action_predicate_extractor(pred_path, question_path, llm_prediction_path)
     
     # data_prepare(annotation_path, Video_folder, map_save_path, YOLO_detect_path, vector_data_path, llm_prediction_path, 16390)
     # train_pipeline(vector_data_path, config=DriveLM(), weight_save_path=weight_save_path)   
