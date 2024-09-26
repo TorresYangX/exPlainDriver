@@ -2,7 +2,9 @@ import json
 import re
 from tqdm import tqdm
 from openai import OpenAI
+from pgm.predicate_map_drivelm import json_to_vectors
 import os
+from pgm.DriveLM_extractor import DriveLM_extractor
 
 
 def action_map(sentence):
@@ -103,6 +105,16 @@ def gpt_map_cs(Speed, Course):
                 presence_penalty=0.0,
             ).choices[0]
     return response.message.content
+
+
+def data_prepare(conv_path, question_path, YOLO_detect_path, vector_data_path, llm_prediction_path):
+    drive_extractor = DriveLM_extractor()
+    drive_extractor.condition_predicate_extractor(conv_path, question_path, YOLO_detect_path)
+    json_to_vectors(YOLO_detect_path, vector_data_path, llm_prediction_path)
+    return
+
+def train_pipeline():
+    pass
             
 
         

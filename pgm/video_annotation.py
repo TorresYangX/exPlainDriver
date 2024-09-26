@@ -2,7 +2,7 @@ import json
 import pandas as pd
 from tqdm import tqdm
 
-annotation_path = 'Data/BDD-X-Dataset/BDD-X-Annotations_v1.csv'
+annotation_path = 'Data/BDDX/BDD-X-Dataset/BDD-X-Annotations_v1.csv'
 ori_annotation = pd.read_csv(annotation_path)
 # ori_annotation = ori_annotation.dropna(subset=['Input.Video'])
 ori_annotation['Input.Video'] = ori_annotation['Input.Video'].dropna().apply(lambda x: x.split('/')[-1])

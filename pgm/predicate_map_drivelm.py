@@ -135,7 +135,6 @@ def combine_vectors(action_vector, class_vector, cs_vector, llm_vector):
     combined_vector = [max(a, c, cs, llm) for a, c, cs, llm in zip(action_vector, class_vector, cs_vector, llm_vector)]
     return combined_vector
 
-
 def segment_to_vector(segment, llm_prediction):
     action_vector = map_action_to_vector(segment["action"])
     class_vector = map_classes_to_vector(segment["classes"])
@@ -156,9 +155,41 @@ def json_to_vectors(YOLO_detect_path, train_data_savePth, llm_prediction_path):
     for item in tqdm(data):
         id = item["image_id"]
         llm_prediction = id2prediction(id, prediction_data)
+        llm_prediction = item["action"]
         vector = segment_to_vector(item, llm_prediction)
         vectors.append(vector)
     print(len(vectors), len(vectors[0]))
     with open(train_data_savePth, "wb") as f:
         pickle.dump(vectors, f)  
     return
+
+# def combine_vectors(action_vector, class_vector, cs_vector):
+#     combined_vector = [max(a, c, cs) for a, c, cs in zip(action_vector, class_vector, cs_vector)]
+#     return combined_vector
+
+# def segment_to_vector(segment):
+#     action_vector = map_action_to_vector(segment["action"])
+#     class_vector = map_classes_to_vector(segment["classes"])
+#     cs_vector = map_cs_to_vector(segment["velocity_predicate"], segment["direction_predicate"])
+#     return combine_vectors(action_vector, class_vector, cs_vector)
+
+
+# def json_to_vectors(YOLO_detect_path, train_data_savePth):
+#     print('begin to convert json to vectors...')
+#     data = json.load(open(YOLO_detect_path))
+    
+#     conv_data = json.load(open('Data/DriveLM/DriveLM_process/conversation_drivelm_train.json', 'r'))
+    
+#     conv_data_ids = [item['id'] for item in conv_data]
+    
+#     vectors = []
+#     for item in tqdm(data):
+#         id = item["image_id"]
+#         if id not in conv_data_ids:
+#             continue
+#         vector = segment_to_vector(item)
+#         vectors.append(vector)
+#     print(len(vectors), len(vectors[0]))
+#     with open(train_data_savePth, "wb") as f:
+#         pickle.dump(vectors, f)  
+#     return
