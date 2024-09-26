@@ -4,7 +4,40 @@ from pyquaternion import Quaternion
 from ultralytics import YOLO
 import json
 from tqdm import tqdm
-from utils_drivelm import get_option, action_map
+import re
+
+def action_map(sentence):
+    mapping_rules = {
+        r'going straight': 'Straight',
+        r'driving fast': 'Fast',
+        r'driving very fast': 'Fast',
+        r'driving slowly': 'Slow',
+        r'driving with normal speed': 'Normal',
+        r'not moving': 'Stop',
+        r'slightly steering to the left': 'Straight',
+        r'slightly steering to the right': 'Straight',
+        r'steering to the left': 'Left',
+        r'steering to the right': 'Right',
+    }
+    actions = []
+    matched_patterns = set()
+    for pattern,action in mapping_rules.items():
+        if re.search(pattern, sentence, re.IGNORECASE):
+            if 'steering' in pattern:  # 处理 steering 行为，防止多次匹配
+                if 'slightly' in pattern or 'steering' not in matched_patterns:
+                    matched_patterns.add('steering')
+                    actions.append(action)
+            else:
+                actions.append(action)
+    return actions
+
+def get_option(text, option_letter):
+    pattern = rf"{option_letter}\.\s(.+?)(?=\s[A-Z]\.|$)"  # 匹配指定的选项，直到下一个选项或文本末尾
+    match = re.search(pattern, text, re.DOTALL)  # 使用 DOTALL 使 . 可以匹配换行符
+    if match:
+        return match.group(1).strip()  # 返回匹配到的选项内容并去掉前后空格
+    else:
+        return None
 
 
 class DriveLM_extractor:
