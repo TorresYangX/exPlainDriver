@@ -27,9 +27,11 @@ def predicate_judge(action_list, ground_action_list):
 def LLM_PGM_acc(weights, config, detection_result):
     pgm = PGM(weights=weights, config=config)
     yolo_detect_Test = json.load(open(detection_result)) 
-    model_type = "rag"
-    LLM_result_predicate = json.load(open(f'result/{model_type}/LLM_result_predicate_{model_type}.json'))
-    base_predicate = json.load(open(f'result/vanilla/LLM_result_predicate_vanilla.json'))
+    model_type = "ragdriver_kl_0.01-0.35_geo_unskew_filled"
+    # model_type = "vanilla"
+    # model_type = 'ragdriver_kl_0.01-0.35_geo_unskew_filled_rag_top2_v8'
+    LLM_result_predicate = json.load(open(f'result/{model_type}/LLM_result.json'))
+    base_predicate = json.load(open(f'result/vanilla/LLM_result.json'))
     total = 0
     correct_pgm = 0
     correct = 0
@@ -72,14 +74,11 @@ def LLM_PGM_acc(weights, config, detection_result):
                 'velocity_predicate': v_p,
                 'direction_predicate': d_p
             }    
-            instance_vector = np.array(segment_to_vector(instance))
+            llm_prediction = [action]
+            instance_vector = np.array(segment_to_vector(instance, llm_prediction))
             condition = instance_vector[config.action_num:]
-            prob = pgm.compute_instance_probability(instance_vector)
-            if prob < 0.001:
-                _, index = pgm.infer_action_probability(condition)
-                LLM_action.append(action_list[index])
-            else:
-                LLM_action.append(action)
+            _, index = pgm.infer_action_probability(condition)
+            LLM_action.append(action_list[index])
         if predicate_judge(LLM_action, ground_action):
             correct_pgm += 1
             pgm_flag = True
@@ -135,22 +134,8 @@ def LLM_PGM_acc(weights, config, detection_result):
 
 
 if __name__ == "__main__":
-    yolo_detect_Test_path = 'process_data/test/test_detected_classes.json'
-    
-    weights = np.array([
-        15.51559968,  15.07370472, 15.73000304, 15.45839886,  12.28816603,  12.93708945,
-        12.76099285,  12.08004622,  12.59233605,  12.06403711,  12.06403630,  12.03201807,
-        12.65637727,  12.51229441,  12.08004540,  12.19210990, 30.65301903, 12.03725726,
-        15.06927711, 15.06927711, 15.06927711, 15.06927711, 15.06927711, 
-        34.89316792,
-        15.06927711, 
-    
-        2.00000000, 2.00000000,
-        2.00000000, 2.00000000, 
-        10.00000000,
-        10.00000000, 10.00000000
-    ]) 
-    
+    yolo_detect_Test_path = 'process_data/eval_filled_rag_top2_v8/eval_filled_rag_top2_v8_detected_classes.json'
+    weights = np.load('optimal_weights_bddx_filled_rag_top2_v8.npy')
     LLM_PGM_acc(weights, BDDX(), yolo_detect_Test_path)
     
         
