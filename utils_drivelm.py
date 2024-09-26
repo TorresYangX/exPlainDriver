@@ -15,8 +15,8 @@ def action_map(sentence):
         r'not moving': 'Stop',
         r'slightly steering to the left': 'Straight',
         r'slightly steering to the right': 'Straight',
-        r'steering to the right': 'Left',
-        r'steering to the left': 'Right',
+        r'steering to the left': 'Left',
+        r'steering to the right': 'Right',
     }
     actions = []
     matched_patterns = set()
@@ -57,7 +57,7 @@ def pred_action_predicate_extractor(pred_path, question_path, info_save_path):
         info = {
             "image_id": pred_list[0]['image_id'],
             "option": option,
-            "action_list": action_list
+            "action": action_list
         }
         infos.append(info)
         with open(info_save_path, 'w') as f:
