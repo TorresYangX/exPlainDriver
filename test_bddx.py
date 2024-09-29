@@ -27,9 +27,9 @@ def predicate_judge(action_list, ground_action_list):
 def LLM_PGM_acc(weights, config, detection_result):
     pgm = PGM(weights=weights, config=config)
     yolo_detect_Test = json.load(open(detection_result)) 
-    model_type = "ragdriver_kl_0.01-0.35_geo_unskew_filled"
     # model_type = "vanilla"
-    # model_type = 'ragdriver_kl_0.01-0.35_geo_unskew_filled_rag_top2_v8'
+    # model_type = "ragdriver_kl_0.01-0.35_geo_unskew_filled"
+    model_type = 'ragdriver_kl_0.01-0.35_geo_unskew_filled_rag_top2_v8'
     LLM_result_predicate = json.load(open(f'result/{model_type}/LLM_result.json'))
     base_predicate = json.load(open(f'result/vanilla/LLM_result.json'))
     total = 0
@@ -134,8 +134,8 @@ def LLM_PGM_acc(weights, config, detection_result):
 
 
 if __name__ == "__main__":
-    yolo_detect_Test_path = 'process_data/eval_filled_rag_top2_v8/eval_filled_rag_top2_v8_detected_classes.json'
-    weights = np.load('optimal_weights_bddx_filled_rag_top2_v8.npy')
+    yolo_detect_Test_path = 'Data/BDDX/process_data/eval_filled/eval_filled_detected_classes.json'
+    weights = np.load('weights/optimal_weights_bddx_filled_rag_top2_v8.npy')      
     LLM_PGM_acc(weights, BDDX(), yolo_detect_Test_path)
     
         

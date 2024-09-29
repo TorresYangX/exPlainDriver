@@ -43,19 +43,19 @@ def id2predAns(id, pred_data):
 def main(weight):
     pattern = 'vanilla'
     # drivelm_detect_file
-    with open('process_data_drivelm/test/test_detected_classes.json') as f:
+    with open('Data/DriveLM/process_data_drivelm/test/test_detected_classes.json') as f:
         detect_data = json.load(f)
     # drivelm_question_file
-    with open('DriveLM_process/v1_1_val_nus_q_only.json') as f:
+    with open('Data/DriveLM/DriveLM_process/v1_1_val_nus_q_only.json') as f:
         question_data = json.load(f)
     # pred_predicate_file
     with open(f'result/drivelm_{pattern}/LLM_result.json') as f:
         pred_data = json.load(f)
     # pred_origin_file
-    with open('DriveLM_process/DrivingLM_Test_pred.json') as f:
+    with open('Data/DriveLM/DriveLM_process/DrivingLM_Test_pred.json') as f:
         origin_data = json.load(f)
     # ground_answer_file
-    with open('DriveLM_process/drivelm_val_clean.json') as f:
+    with open('Data/DriveLM/DriveLM_process/drivelm_val_clean.json') as f:
         answer_data = json.load(f)    
 
     # weight = np.load('optimal_weights_drivelm_llm_rule.npy')
@@ -115,6 +115,8 @@ def main(weight):
         if ori_pred_ans in probable_answers:
             pred_ans = ori_pred_ans
         else:
+            if len(probable_answers) > 1:
+                print (f"Multiple probable answers: {probable_answers}")
             pred_ans = probable_answers[0]
 
         if ori_pred_ans == ground_ans:
@@ -176,13 +178,15 @@ def main(weight):
                                         
            
 if __name__ == '__main__':
-    weight = np.array([ 3.99999996,  4.74662582,  4.26896812,  4.68809649,  3.53423538,  3.75047566, 5.59472847, 
+    # weight = np.array([ 
+    #                 17.86671967, 17.8794396,  17.8794396,  17.8794396,  17.8794396,
+    #                 17.8794396,  17.85823962, 17.8794396,  17.8794396,  17.8794396,  17.8794396, 
+    #                 17.8794396, 17.8794396, 17.8794396, 17.8794396,
                     
-                    17.86671967, 17.8794396,  17.8794396,  17.8794396,  17.8794396,
-                    17.8794396,  17.85823962, 17.8794396,  17.8794396,  17.8794396,  17.8794396,
-                    
-                    17.70061279, 19.52688565, 19.58688286, 19.49360417, 13.65220948, 13.56018218, 13.40880087, 
-                    17.8794396,  17.8794396,  17.8794396,  17.8794396,  17.8794396, 17.8794396,  17.8794396 ])
+    #                 17.70061279, 19.52688565, 19.58688286, 19.49360417, 13.65220948, 13.56018218, 13.40880087, 
+    #                 17.8794396,  17.8794396,  17.8794396,  17.8794396,  17.8794396, 17.8794396,  17.8794396 ])
+    weight = np.load('weights/optimal_weights_drivelm_vanilla.npy')
+    # np.save('optimal_weights_drivelm_vanilla.npy', weight)
     main(weight)
         
             
