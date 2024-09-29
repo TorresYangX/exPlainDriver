@@ -6,7 +6,7 @@ import logging
 import numpy as np
 from tqdm import tqdm
 from ultralytics import YOLO
-from utils import gpt_map_action, cs_extractor, gpt_map_cs, update_action, update_action_set
+from utils_bddx import gpt_map_action, cs_extractor, gpt_map_cs, update_action, update_action_set
 logging.getLogger('ultralytics').setLevel(logging.ERROR)
 
 
