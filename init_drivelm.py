@@ -11,13 +11,12 @@ if __name__ == "__main__":
     question_path = 'Data/DriveLM/DriveLM_process/v1_1_val_nus_q_only.json'
     YOLO_detect_path = 'Data/DriveLM/process_data_drivelm/{}/{}_detected_classes.json'.format(pattern, pattern)
     vector_data_path = 'Data/DriveLM/process_data_drivelm/{}/vectors.pkl'.format(pattern)
+    condition_vector_data_path = 'Data/DriveLM/process_data_drivelm/{}/condition_vectors.pkl'.format(pattern)
     llm_prediction_path = 'result/drivelm_pdce/LLM_result.json'
-    weight_save_path = 'optimal_weights_drivelm_llm_rule.npy'    
-    data_prepare(conversation_path, question_path, YOLO_detect_path, vector_data_path, llm_prediction_path)
+    weight_save_path = 'weights/optimal_weights_drivelm_vanilla.npy'    
+    # data_prepare(conversation_path, question_path, YOLO_detect_path, vector_data_path, condition_vector_data_path, llm_prediction_path)
     
-    
-    # data_prepare(annotation_path, Video_folder, map_save_path, YOLO_detect_path, vector_data_path, llm_prediction_path, 16390)
-    # train_pipeline(vector_data_path, config=DriveLM(), weight_save_path=weight_save_path)   
+    train_pipeline(vector_data_path, config=DriveLM(), weight_save_path=weight_save_path)   
     
     # # ==================================================================
     # weight = np.load(weight_save_path)
