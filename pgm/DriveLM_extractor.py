@@ -23,7 +23,7 @@ def action_map(sentence):
     matched_patterns = set()
     for pattern,action in mapping_rules.items():
         if re.search(pattern, sentence, re.IGNORECASE):
-            if 'steering' in pattern:  # 处理 steering 行为，防止多次匹配
+            if 'steering' in pattern:
                 if 'slightly' in pattern or 'steering' not in matched_patterns:
                     matched_patterns.add('steering')
                     actions.append(action)
@@ -32,10 +32,10 @@ def action_map(sentence):
     return actions
 
 def get_option(text, option_letter):
-    pattern = rf"{option_letter}\.\s(.+?)(?=\s[A-Z]\.|$)"  # 匹配指定的选项，直到下一个选项或文本末尾
-    match = re.search(pattern, text, re.DOTALL)  # 使用 DOTALL 使 . 可以匹配换行符
+    pattern = rf"{option_letter}\.\s(.+?)(?=\s[A-Z]\.|$)"
+    match = re.search(pattern, text, re.DOTALL)  
     if match:
-        return match.group(1).strip()  # 返回匹配到的选项内容并去掉前后空格
+        return match.group(1).strip()
     else:
         return None
 

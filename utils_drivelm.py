@@ -2,9 +2,12 @@ import json
 import re
 from tqdm import tqdm
 from openai import OpenAI
-from pgm.predicate_map_drivelm import json_to_vectors
+from pgm.predicate_map_drivelm import json_to_vectors, json_to_condition_vectors
 import os
 from pgm.DriveLM_extractor import DriveLM_extractor
+import pickle
+from pgm.PGM_drivelm import PGM
+import numpy as np
 
 
 def action_map(sentence):
@@ -107,14 +110,20 @@ def gpt_map_cs(Speed, Course):
     return response.message.content
 
 
-def data_prepare(conv_path, question_path, YOLO_detect_path, vector_data_path, llm_prediction_path):
-    drive_extractor = DriveLM_extractor()
-    drive_extractor.condition_predicate_extractor(conv_path, question_path, YOLO_detect_path)
+def data_prepare(conv_path, question_path, YOLO_detect_path, vector_data_path, condition_vector_data_path, llm_prediction_path):
+    # drive_extractor = DriveLM_extractor()
+    # drive_extractor.condition_predicate_extractor(conv_path, question_path, YOLO_detect_path)
     json_to_vectors(YOLO_detect_path, vector_data_path, llm_prediction_path)
+    # json_to_condition_vectors(YOLO_detect_path, condition_vector_data_path)
     return
 
-def train_pipeline():
-    pass
+def train_pipeline(train_data_path, config, weight_save_path):
+    with open(train_data_path, 'rb') as f:
+        data = pickle.load(f)
+    train_data = np.array(data)
+    pgm = PGM(config, learning_rate=1e-5, regularization=1e-5, max_iter=10000)
+    weight = pgm.train_mln(train_data, weight_save_path)
+    return weight 
             
 
         

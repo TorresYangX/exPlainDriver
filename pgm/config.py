@@ -67,7 +67,7 @@ class BDDX:
       lambda args: 1 - args[self.predicate["SOLID_RED_LIGHT"]] + args[self.predicate["SOLID_RED_LIGHT"]] * \
                       ((1 - args[self.predicate["ACCELERATE"]]) * \
                        (1 - args[self.predicate["LEFT_PASS"]]) * \
-                       (1 - args[self.predicate["YIELD"]])), # SolidRedLight → ¬Accelerate ∧ ¬PullOver ∧ ¬Park
+                       (1 - args[self.predicate["YIELD"]])), # SolidRedLight → ¬Accelerate ∧ ¬LeftPass ∧ ¬Yield
       
       lambda args: 1 - args[self.predicate["SOLID_YELLOW_LIGHT"]] + args[self.predicate["SOLID_YELLOW_LIGHT"]] * \
                       ((args[self.predicate["MAKE_LEFT_TURN"]] + \
@@ -222,27 +222,6 @@ class BDDX:
       lambda args: 1 - args[self.predicate["PULL_OVER_LLM"]] + args[self.predicate["PULL_OVER_LLM"]] * \
                       args[self.predicate["PULL_OVER"]]  # PULL_OVER_LLM → PULL_OVER            
     ]
-    
-    self.nature_rule=[
-      '1. When you encounter a solid red light, you should stop. \n2. You can turn right on a red light unless a \'NO TURN ON RED\' sign is posted;',
-      'When approaching a solid yellow traffic light, you should stop if you can do so safely. If you cannot stop safely, you should cautiously cross the intersection.',
-      'When you see a yellow arrow, you should prepare to stop, as the protected turning time is ending, unless you cannot stop safely OR you are already in the intersection, in which case you should cautiously complete your turn.',
-      'When you see a red arrow, you should stop and not make any turns. Remain stopped until a green traffic signal light or green arrow appears.',
-      'When you see a Merging Traffic Sign, you should decelarate and be prepared to allow other drivers to merge into your lane.',
-      'When you encounter a NO LEFT TURN sign, you should not make a left turn.',
-      'When you encounter a NO RIGHT TURN sign, you should not make a right turn.',
-      'When you encounter a Pedestrian Crossing Sign, you should DECELERATE and be prepared to stop for pedestrians.',
-      'When approaching a STOP sign, you should make a full stop before entering the crosswalk OR at the limit line. If there is no limit line or crosswalk, you should stop before entering the intersection. After stopping, you should check traffic in all directions before proceeding.',
-      'When approaching a red YIELD sign, you should decelerate AND be ready to stop to let any vehicle, bicyclist, OR pedestrian pass before you proceed.',
-      'When you see a SLOW sign, you should decelerate.',
-  ]
-      
-  def nature_rule_mapping(self, index):
-    violate_rule = []
-    for i in index:
-      violate_rule.append(self.nature_rule[i])
-    return violate_rule
-  
   
   def generate_compliant_data(self):
     data = []
@@ -388,61 +367,81 @@ class DriveLM:
       'STRAIGHT': 6,
       
       'SOLID_RED_LIGHT': 7,
-      'RED_LEFT_ARROW_LIGHT': 8,
-      'NO_LEFT_TURN_SIGN': 9,
-      'NO_RIGHT_TURN_SIGN': 10,
-      'SLOW_SIGN': 11,
+      'SOLID_YELLOW_LIGHT': 8,
+      'YELLOW_LEFT_ARROW_LIGHT': 9,
+      'RED_LEFT_ARROW_LIGHT': 10,
+      'MERGING_TRAFFIC_SIGN': 11,
+      'NO_LEFT_TURN_SIGN': 12,
+      'NO_RIGHT_TURN_SIGN': 13,
+      'PEDESTRIAN_CROSSING_SIGN': 14,
+      'STOP_SIGN': 15,
+      'RED_YIELD_SIGN': 16,
+      'SLOW_SIGN': 17,
+      'SOLID_GREEN_LIGHT': 18,
+          
+      'DOUBLE_DASHED_WHITE_LINE_LEFT': 19,
+      'DOUBLE_DASHED_WHITE_LINE_RIGHT': 20,
+      'SINGLE_SOLID_WHITE_LINE_LEFT': 21,
+      'SINGLE_SOLID_WHITE_LINE_RIGHT': 22,
+      'DOUBLE_SOLID_WHITE_LINE_LEFT': 23,
+      'DOUBLE_SOLID_WHITE_LINE_RIGHT': 24,
+      'SINGLE_ZIGZAG_WHITE_LINE_LEFT': 25,
+      'SINGLE_ZIGZAG_WHITE_LINE_RIGHT': 26,
+      'SINGLE_SOLID_YELLOW_LINE_LEFT': 27,
+      'SINGLE_SOLID_YELLOW_LINE_RIGHT': 28,
       
-      'DOUBLE_DASHED_WHITE_LINE_LEFT': 12,
-      'DOUBLE_DASHED_WHITE_LINE_RIGHT': 13,
-      'SINGLE_SOLID_WHITE_LINE_LEFT': 14,
-      'SINGLE_SOLID_WHITE_LINE_RIGHT': 15,
-      'DOUBLE_SOLID_WHITE_LINE_LEFT': 16,
-      'DOUBLE_SOLID_WHITE_LINE_RIGHT': 17,
-      'SINGLE_ZIGZAG_WHITE_LINE_LEFT': 18,
-      'SINGLE_ZIGZAG_WHITE_LINE_RIGHT': 19,
-      'SINGLE_SOLID_YELLOW_LINE_LEFT': 20,
-      'SINGLE_SOLID_YELLOW_LINE_RIGHT': 21,
+      'NORMAL_CS': 29,
+      'FAST_CS': 30,
+      'SLOW_CS': 31,
+      'STOP_CS': 32,
+      'LEFT_CS': 33,
+      'RIGHT_CS': 34,
+      'STRAIGHT_CS': 35,
       
-      'NORMAL_CS': 22,
-      'FAST_CS': 23,
-      'SLOW_CS': 24,
-      'STOP_CS': 25,
-      'LEFT_CS': 26,
-      'RIGHT_CS': 27,
-      'STRAIGHT_CS': 28,
-      
-      'NORMAL_LLM': 29,
-      'FAST_LLM': 30,
-      'SLOW_LLM': 31,
-      'STOP_LLM': 32,
-      'LEFT_LLM': 33,
-      'RIGHT_LLM': 34,
-      'STRAIGHT_LLM': 35
+      'NORMAL_LLM': 36,
+      'FAST_LLM': 37,
+      'SLOW_LLM': 38,
+      'STOP_LLM': 39,
+      'LEFT_LLM': 40,
+      'RIGHT_LLM': 41,
+      'STRAIGHT_LLM': 42
     }
     
     self.velocity_action_num = 4
     self.direction_action_num = 3
     self.action_num = 7
-    self.condition_num = 29
+    self.condition_num = 36
       
     self.formulas = [      
       
       lambda args: 1 - args[self.predicate["SOLID_RED_LIGHT"]] + args[self.predicate["FAST"]] * \
                       (1 - args[self.predicate["FAST"]]), # SolidRedLight → ¬Fast
+                      
+      lambda args: 1 - args[self.predicate["SOLID_YELLOW_LIGHT"]] + args[self.predicate["FAST"]] * \
+                      (1 - args[self.predicate["FAST"]]), # SolidYellowLight → ¬Fast
+                      
+      lambda args: 1 - args[self.predicate["YELLOW_LEFT_ARROW_LIGHT"]] + args[self.predicate["YELLOW_LEFT_ARROW_LIGHT"]] * \
+                      (args[self.predicate["STOP"]] + args[self.predicate["SLOW"]] - \
+                      args[self.predicate["STOP"]] * args[self.predicate["SLOW"]]),  # YellowLeftArrowLight → Stop ∨ Slow
 
       lambda args: 1 - args[self.predicate["RED_LEFT_ARROW_LIGHT"]] + args[self.predicate["RED_LEFT_ARROW_LIGHT"]] * \
                       (1 - args[self.predicate["LEFT"]]),  # RedLeftArrowLight → ¬Left
+      
+      lambda args: 1 - args[self.predicate["MERGING_TRAFFIC_SIGN"]] + args[self.predicate["MERGING_TRAFFIC_SIGN"]] * \
+                     (1- args[self.predicate["FAST"]]),  # MergingTrafficSign → ¬Fast
 
       lambda args: 1 - args[self.predicate["NO_LEFT_TURN_SIGN"]] + args[self.predicate["NO_LEFT_TURN_SIGN"]] * \
                       (1 - args[self.predicate["LEFT"]]),  # NoLeftTurnSign → ¬Left
 
       lambda args: 1 - args[self.predicate["NO_RIGHT_TURN_SIGN"]] + args[self.predicate["NO_RIGHT_TURN_SIGN"]] * \
                       (1 - args[self.predicate["RIGHT"]]),  # NoRightTurnSign → ¬Right
+      
+      lambda args: 1 - args[self.predicate["RED_YIELD_SIGN"]] + args[self.predicate["RED_YIELD_SIGN"]] * \
+                      (1-args[self.predicate["FAST"]]),  # RedYieldSign → ¬Fast  
 
       lambda args: 1 - args[self.predicate["SLOW_SIGN"]] + args[self.predicate["SLOW_SIGN"]] * \
                       (1 - args[self.predicate["FAST"]]),  # SlowSign → ¬Fast  
-      
+                      
       lambda args: 1 - args[self.predicate["SINGLE_SOLID_WHITE_LINE_LEFT"]] + args[self.predicate["SINGLE_SOLID_WHITE_LINE_LEFT"]] * \
                       (1 - args[self.predicate["LEFT"]]),  # SingleSolidWhiteLineLeft → ¬Left
                       

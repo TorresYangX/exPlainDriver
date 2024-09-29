@@ -2,7 +2,10 @@ import json
 import pickle
 from tqdm import tqdm
 
-predicate_num = 36
+predicate_num = 43
+action_num = 7
+llm_action_num = 7
+
 
 action_map = {
     "Noraml": 0,
@@ -16,21 +19,34 @@ action_map = {
 
 class_map = {
     "stop traffic light": 7, 
-    "stop left": 8, 
-    "stop left traffic light": 8, 
-    "noLeftTurn": 9,
-    "noRightTurn": 10,
-    "slow": 11,
-    'DOUBLE_DASHED_WHITE_LEFT': 12,
-    'DOUBLE_DASHED_WHITE_RIGHT': 13,
-    'SINGLE_SOLID_WHITE_LEFT': 14,
-    'SINGLE_SOLID_WHITE_RIGHT': 15,
-    'DOUBLE_SOLID_WHITE_LEFT': 16,
-    'DOUBLE_SOLID_WHITE_RIGHT': 17,
-    'SINGLE_ZIGZAG_WHITE_LEFT': 18,
-    'SINGLE_ZIGZAG_WHITE_RIGHT': 19,
-    'SINGLE_SOLID_YELLOW_LEFT': 20,
-    'SINGLE_SOLID_YELLOW_RIGHT': 21,
+    "warning": 8, 
+    "warning traffic light": 8, 
+    "warning left": 9, 
+    "warning left traffic light": 9, 
+    "stop left": 10, 
+    "stop left traffic light": 10, 
+    "merge": 11,
+    "noLeftTurn": 12,
+    "noRightTurn": 13,
+    "pedestrianCrossing": 14,
+    "stop": 15,
+    "stopAhead": 15,
+    "yield": 16,
+    "yieldAhead": 16,
+    "slow": 17,
+    "go": 18,
+    "go forward": 18,
+    "go forward traffic light": 18,
+    'DOUBLE_DASHED_WHITE_LEFT': 19,
+    'DOUBLE_DASHED_WHITE_RIGHT': 20,
+    'SINGLE_SOLID_WHITE_LEFT': 21,
+    'SINGLE_SOLID_WHITE_RIGHT': 22,
+    'DOUBLE_SOLID_WHITE_LEFT': 23,
+    'DOUBLE_SOLID_WHITE_RIGHT': 24,
+    'SINGLE_ZIGZAG_WHITE_LEFT': 25,
+    'SINGLE_ZIGZAG_WHITE_RIGHT': 26,
+    'SINGLE_SOLID_YELLOW_LEFT': 27,
+    'SINGLE_SOLID_YELLOW_RIGHT': 28,
     
     
     "intersection": None,
@@ -74,16 +90,6 @@ class_map = {
 }
 
 cs_map = {
-    'Normal': 22,
-    'Fast': 23,
-    'Slow': 24,
-    'Stop': 25,
-    'Left': 26,
-    'Right': 27,
-    'Straight': 28,
-}
-
-LLM_action_map = {
     'Normal': 29,
     'Fast': 30,
     'Slow': 31,
@@ -91,6 +97,16 @@ LLM_action_map = {
     'Left': 33,
     'Right': 34,
     'Straight': 35,
+}
+
+LLM_action_map = {
+    'Normal': 36,
+    'Fast': 37,
+    'Slow': 38,
+    'Stop': 39,
+    'Left': 40,
+    'Right': 41,
+    'Straight': 42,
 }
 
 
@@ -150,10 +166,16 @@ def id2prediction(id, prediction_data):
 def json_to_vectors(YOLO_detect_path, train_data_savePth, llm_prediction_path):
     print('begin to convert json to vectors...')
     data = json.load(open(YOLO_detect_path))
+    
+    conv_data = json.load(open('Data/DriveLM/DriveLM_process/conversation_drivelm_train.json', 'r'))
+    conv_data_ids = [item['id'] for item in conv_data]
+    
     vectors = []
     prediction_data = json.load(open(llm_prediction_path))
     for item in tqdm(data):
         id = item["image_id"]
+        if id not in conv_data_ids:
+            continue
         llm_prediction = id2prediction(id, prediction_data)
         llm_prediction = item["action"]
         vector = segment_to_vector(item, llm_prediction)
@@ -163,33 +185,31 @@ def json_to_vectors(YOLO_detect_path, train_data_savePth, llm_prediction_path):
         pickle.dump(vectors, f)  
     return
 
-# def combine_vectors(action_vector, class_vector, cs_vector):
-#     combined_vector = [max(a, c, cs) for a, c, cs in zip(action_vector, class_vector, cs_vector)]
-#     return combined_vector
+def combine_condition_vectors(class_vector, cs_vector):
+    combined_vector = [max(c, cs) for c, cs in zip(class_vector, cs_vector)]
+    return combined_vector
 
-# def segment_to_vector(segment):
-#     action_vector = map_action_to_vector(segment["action"])
-#     class_vector = map_classes_to_vector(segment["classes"])
-#     cs_vector = map_cs_to_vector(segment["velocity_predicate"], segment["direction_predicate"])
-#     return combine_vectors(action_vector, class_vector, cs_vector)
+def segment_to_condition_vector(segment):
+    class_vector = map_classes_to_vector(segment["classes"])
+    cs_vector = map_cs_to_vector(segment["velocity_predicate"], segment["direction_predicate"])
+    return combine_condition_vectors(class_vector, cs_vector)
 
 
-# def json_to_vectors(YOLO_detect_path, train_data_savePth):
-#     print('begin to convert json to vectors...')
-#     data = json.load(open(YOLO_detect_path))
+def json_to_condition_vectors(YOLO_detect_path, train_data_savePth):
+    print('begin to convert json to condition vectors...')
+    data = json.load(open(YOLO_detect_path))
     
-#     conv_data = json.load(open('Data/DriveLM/DriveLM_process/conversation_drivelm_train.json', 'r'))
+    conv_data = json.load(open('Data/DriveLM/DriveLM_process/conversation_drivelm_test.json', 'r'))
+    conv_data_ids = [item['id'] for item in conv_data]
     
-#     conv_data_ids = [item['id'] for item in conv_data]
-    
-#     vectors = []
-#     for item in tqdm(data):
-#         id = item["image_id"]
-#         if id not in conv_data_ids:
-#             continue
-#         vector = segment_to_vector(item)
-#         vectors.append(vector)
-#     print(len(vectors), len(vectors[0]))
-#     with open(train_data_savePth, "wb") as f:
-#         pickle.dump(vectors, f)  
-#     return
+    vectors = []
+    for item in tqdm(data):
+        id = item["image_id"]
+        if id not in conv_data_ids:
+            continue
+        vector = segment_to_condition_vector(item)[action_num: predicate_num-llm_action_num]
+        vectors.append(vector)
+    print(len(vectors), len(vectors[0]))
+    with open(train_data_savePth, "wb") as f:
+        pickle.dump(vectors, f)  
+    return
