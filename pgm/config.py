@@ -1,7 +1,12 @@
-import numpy as np
-
 class BDDX:
   def __init__(self):
+    self.action_list=['Keep', 'Accelerate', 'Decelerate', 'Stop', 'Reverse', 
+                     'MakeLeftTurn', 'MakeRightTurn', 'MakeUTurn', 'Merge', 
+                     'LeftPass', 'RightPass', 'Yield', 'ChangeToLeftLane',
+                     'ChangeToRightLane', 'Park', 'PullOver']
+    self.velocityCS_list = ['Keep', 'Accelerate', 'Decelerate', 'Stop', 'Reverse']
+    self.directionCS_list = ['Straight', 'Left', 'Right']
+    
     self.predicate = {
       'KEEP': 0,
       'ACCELERATE': 1,
@@ -115,18 +120,6 @@ class BDDX:
                       
       lambda args: 1 - args[self.predicate["STOP_SIGN"]] + args[self.predicate["STOP_SIGN"]] * \
                       (1 - args[self.predicate["PULL_OVER"]]),  # StopSign → ¬Pull_Over
-                      
-      # lambda args: 1 - args[self.predicate["KEEP_CS"]] + args[self.predicate["KEEP_CS"]] * \
-      #                 args[self.predicate["KEEP"]],  # KEEP_CS → Keep
-
-      # lambda args: 1 - args[self.predicate["ACCELERATE_CS"]] + args[self.predicate["ACCELERATE_CS"]] * \
-      #                 args[self.predicate["ACCELERATE"]],  # ACCELERATE_CS → Accelerate
-                      
-      # lambda args: 1 - args[self.predicate["DECELERATE_CS"]] + args[self.predicate["DECELERATE_CS"]] * \
-      #                 args[self.predicate["DECELERATE"]],  # DECELERATE_CS → DECELERATE
-                      
-      # lambda args: 1 - args[self.predicate["STOP_CS"]] + args[self.predicate["STOP_CS"]] * \
-      #                 args[self.predicate["STOP"]],  # STOP_CS → Stop
       
       lambda args: 1 - args[self.predicate["KEEP_CS"]] + args[self.predicate["KEEP_CS"]] * \
                       (args[self.predicate["KEEP"]] + args[self.predicate["ACCELERATE"]]),  # KEEP_CS → KEEP ∨ ACCELERATE
@@ -156,24 +149,7 @@ class BDDX:
                 
       lambda args: 1 - (args[self.predicate["RIGHT_CS"]] * args[self.predicate["CHANGE_TO_LEFT_LANE_LLM"]]) + \
               (args[self.predicate["RIGHT_CS"]] * args[self.predicate["CHANGE_TO_LEFT_LANE_LLM"]] * args[self.predicate["CHANGE_TO_RIGHT_LANE"]]),  # RIGHT_CS ∧ ChangeToLeftLane_llm → ChangeToRightLane   
-       
-      # KEEP_LLM → KEEP
-      # ACCELERATE_LLM → ACCELERATE
-      # DECELERATE_LLM → DECELERATE
-      # STOP_LLM → STOP
-      # REVERSE_LLM → REVERSE
-      # MAKE_LEFT_TURN_LLM → MAKE_LEFT_TURN
-      # MAKE_RIGHT_TURN_LLM → MAKE_RIGHT_TURN
-      # MAKE_U_TURN_LLM → MAKE_U_TURN
-      # MERGE_LLM → MERGE
-      # LEFT_PASS_LLM → LEFT_PASS
-      # RIGHT_PASS_LLM → RIGHT_PASS
-      # YIELD_LLM → YIELD
-      # CHANGE_TO_LEFT_LANE_LLM → CHANGE_TO_LEFT_LANE
-      # CHANGE_TO_RIGHT_LANE_LLM → CHANGE_TO_RIGHT_LANE
-      # PARK_LLM → PARK
-      # PULL_OVER_LLM → PULL_OVER
-      
+
       lambda args: 1 - args[self.predicate["KEEP_LLM"]] + args[self.predicate["KEEP_LLM"]] * \
                       args[self.predicate["KEEP"]],  # KEEP_LLM → KEEP
       
@@ -223,140 +199,11 @@ class BDDX:
                       args[self.predicate["PULL_OVER"]]  # PULL_OVER_LLM → PULL_OVER            
     ]
   
-  def generate_compliant_data(self):
-    data = []
-    for rule in self.formulas:
-        args = np.zeros(self.action_num+self.condition_num)
-        if "MAKE_LEFT_TURN" in rule.__code__.co_consts:
-            args[self.predicate["MAKE_LEFT_TURN"]] = 1
-        elif "MAKE_RIGHT_TURN" in rule.__code__.co_consts:
-            args[self.predicate["MAKE_RIGHT_TURN"]] = 1
-        else:
-            args[np.random.choice(list(range(16)))] = 1
-        condition_indices = [i for name, i in self.predicate.items() if name in rule.__code__.co_consts and i >= 16 and i < 28]
-        print(condition_indices)
-        if condition_indices:
-          for index in condition_indices:
-              args[index] = 1
-        args[np.random.choice(list(range(28, 33)))] = 1
-        args[np.random.choice(list(range(34, 36)))] = 1
-        
-        if rule(args):
-            data.append(list(args))
-    return data
-  
-  
-  def generate_noncompliant_data(self):
-    data = []
-    while len(data) < len(self.formulas):
-        args = np.zeros(self.action_num+self.condition_num)
-        args[np.random.choice(list(range(16)))] = 1
-        selected_conditions = np.random.choice(list(range(16, 28)), np.random.randint(0, 3), replace=False)
-        for index in selected_conditions:
-            args[index] = 1
-        args[np.random.choice(list(range(28, 33)))] = 1
-        args[np.random.choice(list(range(34, 36)))] = 1
-        if not any(rule(args) for rule in self.formulas):
-            data.append(args)
-    return data
-  
-  
-  def generate_dataset(self, total_samples, real_data, positive_rate=0.8):
-    num_compliant = int(total_samples * positive_rate)  # 80% synthetic positive samples
-    num_noncompliant = total_samples - num_compliant  # 20% synthetic negative samples
-
-    # Generate synthetic compliant data
-    compliant_data = []
-    while len(compliant_data) < num_compliant:
-        compliant_data.extend(self.generate_compliant_data())
-        if len(compliant_data) > num_compliant:
-            compliant_data = compliant_data[:num_compliant]
-
-    # Generate synthetic noncompliant data
-    noncompliant_data = []
-    while len(noncompliant_data) < num_noncompliant:
-        noncompliant_data.extend(self.generate_noncompliant_data())
-        if len(noncompliant_data) > num_noncompliant:
-            noncompliant_data = noncompliant_data[:num_noncompliant]
-
-    # Perturb real_data to create real noncompliant data
-    perturbed_real_data = []
-    for sample in real_data:
-        if np.random.rand() < 1-positive_rate:
-            perturbed_sample = sample.copy()
-            action_indices = list(range(16))  # Indices corresponding to action predicates
-            current_action_index = np.argmax(perturbed_sample[action_indices])  # Find current action
-            perturbed_sample[current_action_index] = 0  # Set the current action to 0
-            remaining_actions = action_indices.copy()
-            remaining_actions.remove(current_action_index)  # Remove the current action index from the list
-            new_action_index = np.random.choice(remaining_actions)  # Select a new action index randomly
-            perturbed_sample[new_action_index] = 1  # Set the new action
-            perturbed_real_data.append(perturbed_sample)
-
-    # Combine synthetic data with real data
-    pos_dataset = compliant_data + real_data 
-    neg_dataset = noncompliant_data + perturbed_real_data
-    np.random.shuffle(pos_dataset)  # Shuffle the combined dataset
-    np.random.shuffle(neg_dataset)
-    return pos_dataset, neg_dataset
-  
-
-def balance_dataset(dataset, action_num, target_ratio=0.1):
-    """
-    Balance the dataset by ensuring each action appears with a target ratio.
-
-    Parameters:
-    - dataset: List of numpy arrays representing the dataset where each instance has actions and conditions.
-    - action_num: Total number of action predicates.
-    - target_ratio: Target ratio for each action in the dataset (default is 0.1).
-
-    Returns:
-    - Balanced dataset as a list of numpy arrays.
-    """
-
-    # Convert dataset to numpy array for easier processing
-    dataset = np.array(dataset)
-
-    # Count the occurrences of each action
-    action_counts = np.zeros(action_num)
-    for instance in dataset:
-        action_indices = list(range(action_num))
-        action_counts += instance[action_indices]
-
-    # Calculate target number of samples for each action
-    total_samples = len(dataset)
-    target_counts = total_samples * target_ratio
-
-    # Create a dictionary to store indices for each action
-    action_indices_dict = {i: [] for i in range(action_num)}
-    for index, instance in enumerate(dataset):
-        action_indices = list(range(action_num))
-        for action_index in action_indices:
-            if instance[action_index] == 1:
-                action_indices_dict[action_index].append(index)
-
-    # Create balanced dataset
-    balanced_dataset = []
-    for action_index in range(action_num):
-        indices = action_indices_dict[action_index]
-        if len(indices) < target_counts:
-            # Need to oversample
-            additional_indices = np.random.choice(indices, int(target_counts - len(indices)), replace=True)
-            balanced_dataset.extend(dataset[indices + additional_indices])
-        else:
-            # Need to undersample
-            sampled_indices = np.random.choice(indices, int(target_counts), replace=False)
-            balanced_dataset.extend(dataset[sampled_indices])
-
-    # Shuffle the balanced dataset
-    balanced_dataset = np.array(balanced_dataset)
-    np.random.shuffle(balanced_dataset)
-
-    return balanced_dataset.tolist()
-  
   
 class DriveLM:
   def __init__(self):
+    self.action_list = ['Normal', 'Fast', 'Slow', 'Stop', 'Left', 'Right', 'Straight']
+    
     self.predicate = {
       'NORMAL': 0,
       'FAST': 1,

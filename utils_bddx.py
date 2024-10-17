@@ -1,8 +1,6 @@
 import re
 import os
-import cv2
 import json
-import torch
 import string
 import pickle
 import numpy as np
@@ -11,40 +9,11 @@ from pgm.PGM import PGM
 from openai import OpenAI
 from pgm.predicate_map import json_to_vectors
 from pgm.video_annotation import query_annotation_csv
-from transformers import AutoModelForCausalLM, AutoTokenizer
-
-def Llama3_map_action(action):
-    """
-    map action to predicates
-    """  
-    model_path = "/home/xuanyang/data/Meta-Llama-3-8B-Instruct/"
-    tokenizer = AutoTokenizer.from_pretrained(model_path)
-    model = AutoModelForCausalLM.from_pretrained(model_path).to("cuda:3")
-    prompt = """Given the current behavior of the car, use one predicate to best describe the behavior of the car. If multiple actions are described, take the last one. The predicates are: 
-    Keep, Accelerate, Decelerate, Stop, Reverse, MakeLeftTurn, MakeRightTurn, MakeUTurn, Merge, LeftPass, RightPass, Yield, ChangeToLeftLane, ChangeToRightLane, Park, PullOver.
-    Here are some examples:
-    #Current Behavior#: The car is travelling down the road.
-    #Predicates#: Keep\n
-    #Current Behavior#: The car is making left turn.
-    #Predicates#: MakeLeftTurn\n
-    #Current Behavior#: The car is slowing down and then comes to a stop.
-    #Predicates#: Stop\n
-    #Current Behavior#: The car is making a left turn an then accelerates.
-    #Predicates#: Accelerate\n
-    #Current Behavior#: {action}
-    #Predicates#: """.format(action=action)
-    
-    inputs = tokenizer(prompt, return_tensors="pt").to("cuda:3")
-    with torch.no_grad():
-        outputs = model.generate(**inputs, max_new_tokens=5)
-    generated_token = outputs[0][len(inputs['input_ids'][0]):]
-    output_text = tokenizer.decode(generated_token, skip_special_tokens=True).strip()
-    return output_text
-
+from pgm.config import BDDX
+import random
 
 def gpt_map_action(action):
     client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
-    
     system_prompt = "You are a helpful assistant"
     prompt = """Given the current behavior of the car, please use one or two predicates below to best describe the behavior of the car. The predicates are: 
     Keep, Accelerate, Decelerate, Stop, Reverse, MakeLeftTurn, MakeRightTurn, MakeUTurn, Merge, LeftPass, RightPass, Yield, ChangeToLeftLane, ChangeToRightLane, Park, PullOver.
@@ -134,77 +103,6 @@ def update_action_set(action_list, ori_actions):
             action_set.append(act)
     return action_set
 
-    
-def action_predicate_count():
-    train_data = json.load(open('Data/video_process/new_conversation_bddx_train.json'))
-    action_list = ['Keep', 'Accelerate', 'Decelerate', 'Stop', 'Reverse', 'MakeLeftTurn', 'MakeRightTurn', 
-                   'MakeUTurn', 'Merge', 'LeftPass', 'RightPass', 'Yield', 'ChangeToLeftLane', 
-                   'ChangeToRightLane', 'Park', 'PullOver']
-    
-    map_action_count = {}
-    
-    for item in tqdm(train_data):
-        action = item['conversations'][1]['value']
-        output = gpt_map_action(action, isPred=False)
-        map_action = update_action(action_list, output)
-        if map_action in ['MakeUTurn','Yield','LeftPass:','RightPass','Park','Reverse','PullOver']:
-            print(f"{action}: {map_action}")
-        if map_action in map_action_count:
-            map_action_count[map_action] += 1
-        else:
-            map_action_count[map_action] = 1
-    for action, count in map_action_count.items():
-        print(f"{action}: {count}")
-    
-    with open('map_action_count.json', 'w') as f:
-        json.dump(map_action_count, f)
-    return map_action_count
-
-
-def pkl_reader(npy_file):
-    with open(npy_file, 'rb') as f:
-        data = pickle.load(f)
-    return data
-
-
-def action_counter(json_path):
-    data = json.load(open(json_path))
-    action_count = {}
-    for item in data:
-        action = item['action']
-        if action in action_count:
-            action_count[action] += 1
-        else:
-            action_count[action] = 1
-    return action_count
-
-
-def video_snapshot(video_path, output_folder, start_second, end_second, interval=1):
-    video_name = video_path.split('/')[-1].split('.')[0] + str(start_second) + '_' + str(end_second)
-    output_path = os.path.join(output_folder, video_name)
-    if not os.path.exists(output_path):
-        os.makedirs(output_path)
-    cap = cv2.VideoCapture(video_path)    
-    fps = cap.get(cv2.CAP_PROP_FPS)    
-    start_frame = start_second * fps
-    end_frame = end_second * fps
-    frame_count = 0
-    image_count = start_second
-    while cap.isOpened():
-        ret, frame = cap.read()
-        if not ret:
-            break
-        # read video from start_frame to end_frame, and save picture every 1 seconds
-        if frame_count >= start_frame and frame_count <= end_frame:
-            if frame_count % round(interval * fps) == 0:
-                image_name = os.path.join(output_path, f'{image_count}.jpg')
-                cv2.imwrite(image_name, frame)
-                image_count += 1
-            
-        frame_count += 1
-    cap.release()
-    return
-
 
 def cs_extractor(id, cs_info):
     data = {}
@@ -222,10 +120,7 @@ def cs_extractor(id, cs_info):
 
 
 def map_LLM_pred(LLM_result_path, save_path):
-    action_list=['Keep', 'Accelerate', 'Decelerate', 'Stop', 'Reverse', 
-                'MakeLeftTurn', 'MakeRightTurn', 'MakeUTurn', 'Merge', 
-                'LeftPass', 'RightPass', 'Yield', 'ChangeToLeftLane',
-                'ChangeToRightLane', 'Park', 'PullOver']
+    action_list=BDDX().action_list
     LLM_result = json.load(open(LLM_result_path))
     extract_result = []
     for item in tqdm(LLM_result):
@@ -241,13 +136,14 @@ def map_LLM_pred(LLM_result_path, save_path):
     return
 
 
-def data_prepare(annotation_path, Video_folder, map_save_path, YOLO_detect_path, vector_data_path, llm_prediction_path, segment_num):
-    # from pgm.BDDX_extractor import YOLO_detector
-    # query_annotation_csv(annotation_path, segment_num, map_save_path)
-    # train_dict = json.load(open(map_save_path))
-    # yolo_dec = YOLO_detector(train_dict, Video_folder)
-    # yolo_dec.extract_classes(YOLO_detect_path)
-    json_to_vectors(YOLO_detect_path, vector_data_path, llm_prediction_path)
+def data_prepare(annotation_path, Video_folder, map_save_path, detect_save_path, vector_save_path, llm_prediction_path, llm_predicate_path):
+    from pgm.BDDX_extractor import YOLO_detector
+    query_annotation_csv(annotation_path, map_save_path)
+    train_dict = json.load(open(map_save_path))
+    yolo_dec = YOLO_detector(train_dict, Video_folder)
+    yolo_dec.extract_classes(detect_save_path, annotation_path)
+    map_LLM_pred(llm_prediction_path, llm_predicate_path)
+    json_to_vectors(detect_save_path, vector_save_path, llm_predicate_path)
     return
 
 
@@ -267,3 +163,93 @@ def test_pipeline(test_data_path, weight_save_path):
     pgm = PGM(weight_path=weight_save_path)
     accuracy = pgm.eval(test_data)
     return accuracy
+
+
+def fake_data_generate(balance_num, truth_data_path):
+    def violates_formulas(args, formulas):
+        return any(formula(args) for formula in formulas)
+    
+    action_map = {
+        'Keep': 'KEEP',
+        'Accelerate': 'ACCELERATE',
+        'Decelerate': 'DECELERATE',
+        'Stop': 'STOP',
+        'Reverse': 'REVERSE',
+        'MakeLeftTurn': 'MAKE_LEFT_TURN',
+        'MakeRightTurn': 'MAKE_RIGHT_TURN',
+        'MakeUTurn': 'MAKE_U_TURN',
+        'Merge': 'MERGE',
+        'LeftPass': 'LEFT_PASS',
+        'RightPass': 'RIGHT_PASS',
+        'Yield': 'YIELD',
+        'ChangeToLeftLane': 'CHANGE_TO_LEFT_LANE',
+        'ChangeToRightLane': 'CHANGE_TO_RIGHT_LANE',
+        'Park': 'PARK',
+        'PullOver': 'PULL_OVER'
+    }
+    
+    truth_data = json.load(open(truth_data_path))
+    action_count = {}
+    for item in truth_data:
+        actions = item['predicate']
+        for action in actions:
+            if action in action_count:
+                action_count[action] += 1
+            else:
+                action_count[action] = 1
+    predicate_set = BDDX().predicate
+    formula_set = BDDX().formulas
+    fake_data=[]
+    for action, count in action_count.items():
+        if count < balance_num:
+            fakedata = [0] * (BDDX().action_num+BDDX().condition_num)
+            action_index = predicate_set[action_map[action]]
+            fakedata[action_index] = 1
+            
+            valid_environment_predicates = []
+            for _ in range(random.randint(0, 2)):
+                temp_data = fakedata.copy()
+                # Randomly select an environment predicate
+                env_pred = random.choice(list(predicate_set.values())[16:28])
+                temp_data[env_pred] = 1
+                
+                # Check if adding this predicate violates any formulas
+                if not violates_formulas(temp_data, formula_set):
+                    valid_environment_predicates.append(env_pred)
+            
+            # Update fakedata with valid environment predicates
+            for pred in valid_environment_predicates:
+                fakedata[pred] = 1
+                
+            if action in BDDX().velocityCS_list:
+                fakedata[28 + ['KEEP', 'ACCELERATE', 'DECELERATE', 'STOP', 'REVERSE'].index(action)] = 1
+            else:
+                random_velocity = random.choice(['KEEP', 'ACCELERATE', 'DECELERATE', 'STOP', 'REVERSE'])
+                fakedata[28 + ['KEEP', 'ACCELERATE', 'DECELERATE', 'STOP', 'REVERSE'].index(random_velocity)] = 1
+                
+            if action in ['MakeLeftTurn', 'LeftPass', 'ChangeToLeftLane']:
+                fakedata[34] = 1  # LEFT_CS
+            elif action in ['MakeRightTurn', 'RightPass', 'ChangeToRightLane']:
+                fakedata[35] = 1  # RIGHT_CS
+            else:
+                random_direction = random.choice([33, 34, 35])  # LEFT_CS or RIGHT_CS
+                fakedata[random_direction] = 1
+                
+            for i in range(36, 52):
+                if random.random() < 0.9:
+                    fakedata[i] = 1 if fakedata[i - 36] else 0
+                else:
+                    MLLM_predicate = random.choice([36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51])
+                    fakedata[MLLM_predicate] = 1
+            
+            fake_data.append(fakedata)
+    return fake_data
+                
+    
+if __name__ == "__main__":
+    
+    map_LLM_pred('Data/BDDX/video_process/v9_top2.json', 'result/v9_top2/LLM_result.json')
+    
+    # data_path = 'result/ragdriver_kl_0.01-0.35_geo_unskew_filled_rag_top2_v8_train/LLM_result.json'
+    # possible_worlds_count(data_path)
+    # print(fake_data_generate(10, truth_data_path))

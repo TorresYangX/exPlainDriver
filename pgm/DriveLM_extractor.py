@@ -1,6 +1,5 @@
 from nuscenes.nuscenes import NuScenes
 from nuscenes.map_expansion.map_api import NuScenesMap
-from pyquaternion import Quaternion
 from ultralytics import YOLO
 import json
 from tqdm import tqdm
@@ -77,7 +76,6 @@ class DriveLM_extractor:
         for lane_info in lanes:
             if lane_info['token'] == lane_token:
                 return lane_info
-        # print (f"Error: {lane_token} not found")
         return None
 
 

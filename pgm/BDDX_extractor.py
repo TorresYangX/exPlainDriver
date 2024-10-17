@@ -1,13 +1,14 @@
 import cv2
 import json
-import torch
 import string
-import logging
-import numpy as np
 from tqdm import tqdm
 from ultralytics import YOLO
 from utils_bddx import gpt_map_action, cs_extractor, gpt_map_cs, update_action, update_action_set
-logging.getLogger('ultralytics').setLevel(logging.ERROR)
+import logging
+from config import BDDX
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 def detect_single_frame(data_dict):
@@ -17,30 +18,25 @@ def detect_single_frame(data_dict):
         start_time = float(data_dict['start_time'])
         end_time = float(data_dict['end_time'])
     except ValueError:
-        print("Invalid start_time or end_time:{}".format(video_path))
+        logger.info("Invalid start_time or end_time:{}".format(video_path))
         return []
-    
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         raise IOError(f"Cannot open video {video_path}")
-    
     frame_rate = cap.get(cv2.CAP_PROP_FPS)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    
     start_frame = int(start_time * frame_rate)
     end_frame = int(end_time * frame_rate)
     if start_frame >= total_frames or end_frame > total_frames or start_frame >= end_frame:
-        print("Invalid start_time or end_time")
+        logger.info("Invalid start_time or end_time")
         cap.release()
         return []
-    
     cap.set(cv2.CAP_PROP_POS_FRAMES, end_frame)
     ret, frame = cap.read()
     if not ret:
-        print("Failed to read the end frame")
+        logger.info("Failed to read the end frame")
         cap.release()
         return []
-    
     yolo_results = set()
     detections = yolo(frame)
     detected_classes = []
@@ -50,13 +46,11 @@ def detect_single_frame(data_dict):
             detected_classes.append(class_name)
     if detected_classes:
             yolo_results.update(detected_classes)
-    
     cap.release()
     return list(yolo_results)
 
 
 class YOLO_detector:
-    
     def __init__(self, video_dict, Video_folder):
         self.model = YOLO('best.pt')
         self.dict = video_dict
@@ -78,101 +72,50 @@ class YOLO_detector:
                 detections.append(class_name)
         return detections
     
-    # detection whole segment
-    def get_yolo_results_for_segment(self, video_index, start_time, end_time):
-        
-        try:
-            start_time = float(start_time)
-            end_time = float(end_time)
-        except ValueError:
-            print("Invalid start_time or end_time:{}".format(video_index))
-            return []
-            
-        cap = self.load_video(video_index)
-        frame_rate = cap.get(cv2.CAP_PROP_FPS)
-        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-
-        # Calculate the frame range for the specified time window
-        start_frame = int(start_time * frame_rate)
-        end_frame = int(end_time * frame_rate)
-        if start_frame >= total_frames or end_frame > total_frames or start_frame >= end_frame:
-            print("Invalid start_time or end_time")
-            cap.release()
-            return []
-
-        yolo_results = set()
-        frame_idx = 0
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
-                break
-            if frame_idx >= start_frame:
-                if frame_idx > end_frame:
-                    break
-                detections = self.detect_objects_yolo(frame)
-                if detections:
-                    yolo_results.update(detections)
-                
-            frame_idx += 1
-        
-        cap.release()
-        return list(yolo_results)
-    
-    
     # detect from last frame
     def get_yolo_results_for_last_frame(self, video_index, start_time, end_time):
         if start_time == None or end_time == None:
-            print("Invalid start_time or end_time:{}".format(video_index))
+            logger.info("Invalid start_time or end_time:{}".format(video_index))
             return []
         try:
             start_time = float(start_time)
             end_time = float(end_time)
         except ValueError:
-            print("Invalid start_time or end_time:{}".format(video_index))
+            logger.info("Invalid start_time or end_time:{}".format(video_index))
             return []
             
         cap = self.load_video(video_index)
         frame_rate = cap.get(cv2.CAP_PROP_FPS)
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-
         # Calculate the frame range for the specified time window
         start_frame = int(start_time * frame_rate)
         end_frame = int(end_time * frame_rate)
         if start_frame >= total_frames or end_frame > total_frames or start_frame > end_frame:
-            print("Invalid start_time or end_time, start:{}, end:{}, total:{}".format(start_frame, end_frame, total_frames))
+            logger.info("Invalid start_time or end_time")
             cap.release()
             return []
-
         uni_samples = 8
         step = max((end_frame - start_frame) // (uni_samples - 1), 1)
-        
         sample_last_frame = start_frame + step * (uni_samples - 1)
-        
         sample_end_frame = min(sample_last_frame, end_frame, total_frames - 1)
-        
         cap.set(cv2.CAP_PROP_POS_FRAMES, sample_end_frame)
         ret, frame = cap.read()
         if not ret:
-            print("Failed to read the end frame, total:{}, sample_end:{}".format(total_frames, sample_end_frame))
+            logger.info("Failed to read the end frame, total:{}, sample_end:{}".format(total_frames, sample_end_frame))
             cap.release()
             return []
-
         yolo_results = set()
         detections = self.detect_objects_yolo(frame)
         if detections:
             yolo_results.update(detections)
-
         cap.release()
         return list(yolo_results)
 
     
-    def extract_classes(self, save_path):
+    def extract_classes(self, save_path, cs_info_path):
         extracted_data = []
-        action_list=['Keep', 'Accelerate', 'Decelerate', 'Stop', 'Reverse', 
-                     'MakeLeftTurn', 'MakeRightTurn', 'MakeUTurn', 'Merge', 
-                     'LeftPass', 'RightPass', 'Yield', 'ChangeToLeftLane',
-                     'ChangeToRightLane', 'Park', 'PullOver']
-        cs_info = json.load(open('Data/video_process/new_conversation_bddx_test.json'))
+        action_list = BDDX().action_list
+        cs_info = json.load(open(cs_info_path))
         for item in tqdm(self.dict):
             video_path = item['original_video']
             start_time = item['start_time']
@@ -183,9 +126,9 @@ class YOLO_detector:
             answer = answer.strip(characters_to_remove)
             actions = update_action_set(action_list, answer)
             cs_data = cs_extractor(item['id'], cs_info)
-            ca_predicate = gpt_map_cs(cs_data['Speed'], cs_data['Curvature'], cs_data['Acceleration'], cs_data['Course'])
-            velocity_predicate = update_action(['Keep', 'Accelerate', 'Decelerate', 'Stop', 'Reverse'], ca_predicate)
-            direction_predicate = update_action(['Straight', 'Left', 'Right'], ca_predicate)
+            cs_predicate = gpt_map_cs(cs_data['Speed'], cs_data['Curvature'], cs_data['Acceleration'], cs_data['Course'])
+            velocity_predicate = update_action(BDDX().velocityCS_list, cs_predicate)
+            direction_predicate = update_action(BDDX().directionCS_list, cs_predicate)
             extracted_data.append({
                 'id': item['id'],
                 'video': video_path,

@@ -1,6 +1,9 @@
 import numpy as np
 from pgm.config import *
 from scipy.special import softmax
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def compute_satisfaction(data, formulas):
     satisfaction_counts = np.zeros((len(data), len(formulas)))
@@ -83,22 +86,22 @@ class PGM:
                 action_probs, _ = self.infer_action_probability(condition_input)
                 predictions_prob.append(action_probs[true_labels[len(predictions_prob)]])
             avg_prob = np.mean(predictions_prob)
-            print(f"Iteration {iteration}, Average Probability of Ground Truth Action: {avg_prob}, Log Likelihood: {log_likelihood}")
+            logger.info(f"Iteration {iteration}, Average Probability of Ground Truth Action: {avg_prob}, Log Likelihood: {log_likelihood}")
                     
             if np.abs(log_likelihood - prev_log_likelihood) < self.tol:
                 np.save(saving_path, weights)
-                print("log likelihood converged.")
+                logger.info("log likelihood converged.")
                 break
             
             if np.abs(avg_prob - prev_acc) < self.tol:
                 np.save(saving_path, weights)
-                print("accuracy converged.")
+                logger.info("accuracy converged.")
                 break
             
             if avg_prob > prev_acc:
                 prev_acc = avg_prob
                 np.save(saving_path, weights)
-                print(f"Saving weights at iteration {iteration}")
+                logger.info(f"Saving weights at iteration {iteration}")
                   
             prev_log_likelihood = log_likelihood
             weights = update_weights(weights, satisfaction_counts, self.learning_rate, self.regularization)

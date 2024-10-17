@@ -1,124 +1,83 @@
 import json
 import pickle
 from tqdm import tqdm
+from config import BDDX
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-predicate_num = 52
-
+predicate_num = BDDX().action_num+BDDX().condition_num
 action_map = {
-    "Keep": 0,
-    "Accelerate": 1,
-    "Decelerate": 2,
-    "Stop": 3,
-    "Reverse": 4,
-    "MakeLeftTurn": 5,
-    "MakeRightTurn": 6,
-    "MakeUTurn": 7,
-    "Merge": 8,
-    "LeftPass": 9,
-    "RightPass": 10,
-    "Yield": 11,
-    "ChangeToLeftLane": 12,
-    "ChangeToRightLane": 13,
-    "Park": 14,
-    "PullOver": 15
+    "Keep": BDDX().predicate["KEEP"],
+    "Accelerate": BDDX().predicate["ACCELERATE"],
+    "Decelerate": BDDX().predicate["DECELERATE"],
+    "Stop": BDDX().predicate["STOP"],
+    "Reverse": BDDX().predicate["REVERSE"],
+    "MakeLeftTurn": BDDX().predicate["MAKE_LEFT_TURN"],
+    "MakeRightTurn": BDDX().predicate["MAKE_RIGHT_TURN"],
+    "MakeUTurn": BDDX().predicate["MAKE_U_TURN"],
+    "Merge": BDDX().predicate["MERGE"],
+    "LeftPass": BDDX().predicate["LEFT_PASS"],
+    "RightPass": BDDX().predicate["RIGHT_PASS"],
+    "Yield": BDDX().predicate["YIELD"],
+    "ChangeToLeftLane": BDDX().predicate["CHANGE_TO_LEFT_LANE"],
+    "ChangeToRightLane": BDDX().predicate["CHANGE_TO_RIGHT_LANE"],
+    "Park": BDDX().predicate["PARK"],
+    "PullOver": BDDX().predicate["PULL_OVER"]
 }
-
 class_map = {
-    "stop traffic light": 16, 
-    "warning": 17, 
-    "warning traffic light": 17, 
-    "warning left": 18, 
-    "warning left traffic light": 18, 
-    "stop left": 19, 
-    "stop left traffic light": 19, 
-    "merge": 20,
-    "noLeftTurn": 21,
-    "noRightTurn": 22,
-    "pedestrianCrossing": 23,
-    "stop": 24,
-    "stopAhead": 24,
-    "yield": 25,
-    "yieldAhead": 25,
-    "slow": 26,
-    "go": 27,
-    "go forward": 27,
-    "go forward traffic light": 27,
-    
-    "intersection": None,
-    "addedLane": None,
-    "keepRight": None,
-    "laneEnds": None,
-    "thruMergeLeft": None,
-    "thruTrafficMergeLeft": None,
-    "go left": None,
-    "go left traffic light": None,
-    "curveLeft": None,
-    "curveRight": None,
-    "dip": None,
-    "rampSpeedAdvisory20": None,
-    "rampSpeedAdvisory35": None,
-    "rampSpeedAdvisory40": None,
-    "rampSpeedAdvisory45": None,
-    "rampSpeedAdvisory50": None,
-    "rampSpeedAdvisoryUrdbl": None,
-    "rightLaneMustTurn": None,
-    "roundabout": None,
-    "school": None,
-    "schoolSpeedLimit25": None,
-    "signalAhead": None,
-    "speedLimit15": None,
-    "speedLimit25": None,
-    "speedLimit30": None,
-    "speedLimit35": None,
-    "speedLimit40": None,
-    "speedLimit45": None,
-    "speedLimit50": None,
-    "speedLimit55": None,
-    "speedLimit65": None,
-    "speedLimitUrdbl": None,
-    "thruMergeRight": None,
-    "truckSpeedLimit55": None,
-    "turnLeft": None,
-    "turnRight": None,
-    "zoneAhead25": None,
-    "zoneAhead45": None
+    "stop traffic light": BDDX().predicate["SOLID_RED_LIGHT"], 
+    "warning": BDDX().predicate["SOLID_YELLOW_LIGHT"], 
+    "warning traffic light": BDDX().predicate["SOLID_YELLOW_LIGHT"], 
+    "warning left": BDDX().predicate["YELLOW_LEFT_ARROW_LIGHT"], 
+    "warning left traffic light": BDDX().predicate["YELLOW_LEFT_ARROW_LIGHT"], 
+    "stop left": BDDX().predicate["RED_LEFT_ARROW_LIGHT"], 
+    "stop left traffic light": BDDX().predicate["RED_LEFT_ARROW_LIGHT"], 
+    "merge": BDDX().predicate["MERGING_TRAFFIC_SIGN"],
+    "noLeftTurn": BDDX().predicate["NO_LEFT_TURN_SIGN"],
+    "noRightTurn": BDDX().predicate["NO_RIGHT_TURN_SIGN"],
+    "pedestrianCrossing": BDDX().predicate["PEDESTRIAN_CROSSING_SIGN"],
+    "stop": BDDX().predicate["STOP_SIGN"],
+    "stopAhead": BDDX().predicate["STOP_SIGN"],
+    "yield": BDDX().predicate["RED_YIELD_SIGN"],
+    "yieldAhead": BDDX().predicate["RED_YIELD_SIGN"],
+    "slow": BDDX().predicate["SLOW_SIGN"],
+    "go": BDDX().predicate["SOLID_GREEN_LIGHT"],
+    "go forward": BDDX().predicate["SOLID_GREEN_LIGHT"],
+    "go forward traffic light": BDDX().predicate["SOLID_GREEN_LIGHT"],
 }
-
 cs_map = {
-    "Keep": 28,
-    "Accelerate": 29,
-    "Decelerate": 30,
-    "Stop": 31,
-    "Reverse": 32,
-    "Straight": 33,
-    "Left": 34,
-    "Right": 35,
+    "Keep": BDDX().predicate["KEEP_CS"],
+    "Accelerate": BDDX().predicate["ACCELERATE_CS"],
+    "Decelerate": BDDX().predicate["DECELERATE_CS"],
+    "Stop": BDDX().predicate["STOP_CS"],
+    "Reverse": BDDX().predicate["REVERSE_CS"],
+    "Straight": BDDX().predicate["STRAIGHT_CS"],
+    "Left": BDDX().predicate["LEFT_CS"],
+    "Right": BDDX().predicate["RIGHT_CS"],
 }
-
 LLM_action_map = {
-    "Keep": 36,
-    "Accelerate": 37,
-    "Decelerate": 38,
-    "Stop": 39,
-    "Reverse": 40,
-    "MakeLeftTurn": 41,
-    "MakeRightTurn": 42,
-    "MakeUTurn": 43,
-    "Merge": 44,
-    "LeftPass": 45,
-    "RightPass": 46,
-    "Yield": 47,
-    "ChangeToLeftLane": 48,
-    "ChangeToRightLane": 49,
-    "Park": 50,
-    "PullOver": 51
+    "Keep": BDDX().predicate["KEEP_LLM"],
+    "Accelerate": BDDX().predicate["ACCELERATE_LLM"],
+    "Decelerate": BDDX().predicate["DECELERATE_LLM"],
+    "Stop": BDDX().predicate["STOP_LLM"],
+    "Reverse": BDDX().predicate["REVERSE_LLM"],
+    "MakeLeftTurn": BDDX().predicate["MAKE_LEFT_TURN_LLM"],
+    "MakeRightTurn": BDDX().predicate["MAKE_RIGHT_TURN_LLM"],
+    "MakeUTurn": BDDX().predicate["MAKE_U_TURN_LLM"],
+    "Merge": BDDX().predicate["MERGE_LLM"],
+    "LeftPass": BDDX().predicate["LEFT_PASS_LLM"],
+    "RightPass": BDDX().predicate["RIGHT_PASS_LLM"],
+    "Yield": BDDX().predicate["YIELD_LLM"],
+    "ChangeToLeftLane": BDDX().predicate["CHANGE_TO_LEFT_LANE_LLM"],
+    "ChangeToRightLane": BDDX().predicate["CHANGE_TO_RIGHT_LANE_LLM"],
+    "Park": BDDX().predicate["PARK_LLM"],
+    "PullOver": BDDX().predicate["PULL_OVER_LLM"]
 }
     
 
 def map_action_to_vector(action_list):
-    
     vector = [0] * predicate_num
-    
     # if action is not None
     if action_list:
         for action in action_list:
@@ -171,8 +130,8 @@ def id2prediction(id, prediction_path):
         if item["id"] == id:
             return item["predicate"]
 
-def json_to_vectors(YOLO_detect_path, train_data_savePth, llm_prediction_path):
-    print('begin to convert json to vectors...')
+def json_to_vectors(YOLO_detect_path, data_savePth, llm_prediction_path):
+    logger.info('Begin to convert json to vectors...')
     data = json.load(open(YOLO_detect_path))
     vectors = []
     for item in tqdm(data):
@@ -180,7 +139,7 @@ def json_to_vectors(YOLO_detect_path, train_data_savePth, llm_prediction_path):
         llm_prediction = id2prediction(id, llm_prediction_path)
         vector = segment_to_vector(item, llm_prediction)
         vectors.append(vector)
-    print('vectors shape:', len(vectors), len(vectors[0]))
-    with open(train_data_savePth, "wb") as f:
+    logger.info('vectors shape:', len(vectors), len(vectors[0]))
+    with open(data_savePth, "wb") as f:
         pickle.dump(vectors, f)  
     return

@@ -2,12 +2,15 @@ import json
 import re
 from tqdm import tqdm
 from openai import OpenAI
-from pgm.predicate_map_drivelm import json_to_vectors, json_to_condition_vectors
+from pgm.predicate_map_drivelm import json_to_vectors
 import os
 from pgm.DriveLM_extractor import DriveLM_extractor
 import pickle
 from pgm.PGM_drivelm import PGM
 import numpy as np
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 def action_map(sentence):
@@ -27,7 +30,7 @@ def action_map(sentence):
     matched_patterns = set()
     for pattern,action in mapping_rules.items():
         if re.search(pattern, sentence, re.IGNORECASE):
-            if 'steering' in pattern:  # 处理 steering 行为，防止多次匹配
+            if 'steering' in pattern:
                 if 'slightly' in pattern or 'steering' not in matched_patterns:
                     matched_patterns.add('steering')
                     actions.append(action)
@@ -36,10 +39,10 @@ def action_map(sentence):
     return actions
 
 def get_option(text, option_letter):
-    pattern = rf"{option_letter}\.\s(.+?)(?=\s[A-Z]\.|$)"  # 匹配指定的选项，直到下一个选项或文本末尾
-    match = re.search(pattern, text, re.DOTALL)  # 使用 DOTALL 使 . 可以匹配换行符
+    pattern = rf"{option_letter}\.\s(.+?)(?=\s[A-Z]\.|$)"
+    match = re.search(pattern, text, re.DOTALL)
     if match:
-        return match.group(1).strip()  # 返回匹配到的选项内容并去掉前后空格
+        return match.group(1).strip()
     else:
         return None
     
@@ -56,23 +59,30 @@ def pred_action_predicate_extractor(pred_path, question_path, info_save_path):
         question_part = questions[scene_id]["key_frames"][frame_id]["QA"]["behavior"][0]["Q"]
         pred_answer = pred_list[-2]['caption']
         option = get_option(question_part, pred_answer)
-        action_list = action_map(option)
-        if not action_list or len(action_list) != 2:
+        try:
+            action_list = action_map(option)
+            if not action_list or len(action_list) != 2:
+                print(f"Error: {scene_id}, {frame_id}, {option}")
+            info = {
+                "image_id": pred_list[0]['image_id'],
+                "option": option,
+                "action": action_list
+            }
+            infos.append(info)
+            with open(info_save_path, 'w') as f:
+                json.dump(infos, f, indent=4)
+        except:
             print(f"Error: {scene_id}, {frame_id}, {option}")
-        info = {
-            "image_id": pred_list[0]['image_id'],
-            "option": option,
-            "action": action_list
-        }
-        infos.append(info)
-        with open(info_save_path, 'w') as f:
-            json.dump(infos, f, indent=4)
+            continue
+    logger.info(f"Total {len(infos)} action predicates extracted.")
+    
 
 def control_signal_extractor(cs_string):
     pattern = r"(\w+): \[(.*?)\]"
     matches = re.findall(pattern, cs_string)
     control_signals = {match[0]: eval(f"[{match[1]}]") for match in matches}
     return control_signals
+
 
 def gpt_map_cs(Speed, Course):
     client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
@@ -110,12 +120,13 @@ def gpt_map_cs(Speed, Course):
     return response.message.content
 
 
-def data_prepare(conv_path, question_path, YOLO_detect_path, vector_data_path, condition_vector_data_path, llm_prediction_path):
-    # drive_extractor = DriveLM_extractor()
-    # drive_extractor.condition_predicate_extractor(conv_path, question_path, YOLO_detect_path)
-    json_to_vectors(YOLO_detect_path, vector_data_path, llm_prediction_path)
-    # json_to_condition_vectors(YOLO_detect_path, condition_vector_data_path)
+def data_prepare(conv_path, question_path, detect_save_path, vector_data_path, llm_prediction_path, llm_predicate_path):
+    drive_extractor = DriveLM_extractor()
+    drive_extractor.condition_predicate_extractor(conv_path, question_path, detect_save_path)
+    pred_action_predicate_extractor(llm_prediction_path, question_path, llm_prediction_path)
+    json_to_vectors(detect_save_path, vector_data_path, llm_predicate_path)
     return
+
 
 def train_pipeline(train_data_path, config, weight_save_path):
     with open(train_data_path, 'rb') as f:
