@@ -1,7 +1,7 @@
 import json
 import pickle
 from tqdm import tqdm
-from config import BDDX
+from pgm.config import BDDX
 import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
