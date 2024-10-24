@@ -9,7 +9,8 @@ from pgm.PGM import PGM
 from openai import OpenAI
 from pgm.predicate_map import json_to_vectors
 from pgm.video_annotation import query_annotation_csv
-from pgm.config import BDDX
+# from pgm.config import BDDX
+from arixv.MLN_sole.config import BDDX
 import random
 
 def gpt_map_action(action):
@@ -136,7 +137,7 @@ def map_LLM_pred(LLM_result_path, save_path):
     return
 
 
-def data_prepare(annotation_path, Video_folder, map_save_path, detect_save_path, vector_save_path, llm_prediction_path, llm_predicate_path):
+def bddx_prepare(annotation_path, Video_folder, map_save_path, detect_save_path, vector_save_path, llm_prediction_path, llm_predicate_path):
     from pgm.BDDX_extractor import YOLO_detector
     query_annotation_csv(annotation_path, map_save_path)
     train_dict = json.load(open(map_save_path))

@@ -6,7 +6,8 @@ from pgm.predicate_map_drivelm import json_to_vectors
 import os
 from pgm.DriveLM_extractor import DriveLM_extractor
 import pickle
-from pgm.PGM_drivelm import PGM
+# from pgm.PGM_drivelm import PGM
+from arixv.MLN_sole.MLN import PGM
 import numpy as np
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -120,7 +121,7 @@ def gpt_map_cs(Speed, Course):
     return response.message.content
 
 
-def data_prepare(conv_path, question_path, detect_save_path, vector_data_path, llm_prediction_path, llm_predicate_path):
+def drivelm_prepare(conv_path, question_path, detect_save_path, vector_data_path, llm_prediction_path, llm_predicate_path):
     drive_extractor = DriveLM_extractor()
     drive_extractor.condition_predicate_extractor(conv_path, question_path, detect_save_path)
     pred_action_predicate_extractor(llm_prediction_path, question_path, llm_prediction_path)
